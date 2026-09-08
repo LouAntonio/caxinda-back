@@ -3,13 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { CacheService } from './cache.service';
 
-export const REDIS = 'REDIS';
-
 @Global()
 @Module({
 	providers: [
 		{
-			provide: REDIS,
+			provide: Redis,
 			inject: [ConfigService],
 			useFactory: (configService: ConfigService): Redis => {
 				const url = configService.get<string>(
@@ -21,6 +19,6 @@ export const REDIS = 'REDIS';
 		},
 		CacheService,
 	],
-	exports: [CacheService, REDIS],
+	exports: [CacheService, Redis],
 })
 export class CacheModule {}
