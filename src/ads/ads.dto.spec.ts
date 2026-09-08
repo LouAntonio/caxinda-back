@@ -29,11 +29,10 @@ describe('Ads DTOs', () => {
 			await expect(errorsOf(CreateAdDto, base)).resolves.toEqual([]);
 		});
 
-		it('aceita price, type e location', async () => {
+		it('aceita price e location', async () => {
 			const errors = await errorsOf(CreateAdDto, {
 				...base,
 				price: 250000,
-				type: 'DONATION',
 				location: { lat: -8.8, lng: 13.2 },
 			});
 
@@ -65,15 +64,6 @@ describe('Ads DTOs', () => {
 			});
 
 			expect(errors).toContain('price');
-		});
-
-		it('rejeita type inválido', async () => {
-			const errors = await errorsOf(CreateAdDto, {
-				...base,
-				type: 'LEASE',
-			});
-
-			expect(errors).toContain('type');
 		});
 
 		it('rejeita lat fora do intervalo', async () => {
@@ -120,64 +110,6 @@ describe('Ads DTOs', () => {
 
 			expect(errors).toContain('slug');
 		});
-
-		it('exige tradefor quando type=TRADE', async () => {
-			const errors = await errorsOf(CreateAdDto, {
-				...base,
-				type: 'TRADE',
-			});
-
-			expect(errors).toContain('tradefor');
-		});
-
-		it('aceita tradefor quando type=TRADE', async () => {
-			const errors = await errorsOf(CreateAdDto, {
-				...base,
-				type: 'TRADE',
-				tradefor: ['cadeira', 'monitor'],
-			});
-
-			expect(errors).toEqual([]);
-		});
-
-		it('não exige tradefor quando type != TRADE', async () => {
-			const errors = await errorsOf(CreateAdDto, {
-				...base,
-				type: 'DONATION',
-			});
-
-			expect(errors).toEqual([]);
-		});
-
-		it('rejeita tradefor com mais de 10 itens', async () => {
-			const errors = await errorsOf(CreateAdDto, {
-				...base,
-				type: 'TRADE',
-				tradefor: Array.from({ length: 11 }, (_, i) => `item-${i}`),
-			});
-
-			expect(errors).toContain('tradefor');
-		});
-
-		it('rejeita tradefor com item acima de 80 caracteres', async () => {
-			const errors = await errorsOf(CreateAdDto, {
-				...base,
-				type: 'TRADE',
-				tradefor: ['a'.repeat(81)],
-			});
-
-			expect(errors).toContain('tradefor');
-		});
-
-		it('rejeita tradefor com item vazio', async () => {
-			const errors = await errorsOf(CreateAdDto, {
-				...base,
-				type: 'TRADE',
-				tradefor: [''],
-			});
-
-			expect(errors).toContain('tradefor');
-		});
 	});
 
 	describe('UpdateAdDto', () => {
@@ -203,23 +135,6 @@ describe('Ads DTOs', () => {
 			});
 
 			expect(errors).toContain('slug');
-		});
-
-		it('exige tradefor quando type=TRADE informado', async () => {
-			const errors = await errorsOf(UpdateAdDto, {
-				type: 'TRADE',
-			});
-
-			expect(errors).toContain('tradefor');
-		});
-
-		it('aceita tradefor quando type=TRADE informado', async () => {
-			const errors = await errorsOf(UpdateAdDto, {
-				type: 'TRADE',
-				tradefor: ['cadeira'],
-			});
-
-			expect(errors).toEqual([]);
 		});
 	});
 

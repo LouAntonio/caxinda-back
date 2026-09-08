@@ -22,6 +22,7 @@ describe('ReviewsService', () => {
 	let service: ReviewsService;
 	let prisma: {
 		ad: { findUnique: jest.Mock; update: jest.Mock };
+		business: { findUnique: jest.Mock };
 		review: {
 			findUnique: jest.Mock;
 			create: jest.Mock;
@@ -54,6 +55,7 @@ describe('ReviewsService', () => {
 	beforeEach(async () => {
 		prisma = {
 			ad: { findUnique: jest.fn(), update: jest.fn() },
+			business: { findUnique: jest.fn() },
 			review: {
 				findUnique: jest.fn(),
 				create: jest.fn(),
@@ -78,6 +80,22 @@ describe('ReviewsService', () => {
 	});
 
 	describe('create', () => {
+		it('400 quando faltam adId e businessId', async () => {
+			await expect(
+				service.create('rev-1', { rating: 5 }),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('400 quando adId e businessId são enviados juntos', async () => {
+			await expect(
+				service.create('rev-1', {
+					adId: 'ad-1',
+					businessId: 'biz-1',
+					rating: 5,
+				}),
+			).rejects.toThrow(BadRequestException);
+		});
+
 		it('404 para anúncio inexistente', async () => {
 			prisma.ad.findUnique.mockResolvedValue(null);
 
@@ -145,6 +163,94 @@ describe('ReviewsService', () => {
 				}),
 			);
 		});
+
+		it('404 para empresa inexistente', async () => {
+			prisma.business.findUnique.mockResolvedValue(null);
+
+			await expect(
+				service.create('rev-1', { businessId: 'biz-1', rating: 5 }),
+			).rejects.toThrow(NotFoundException);
+		});
+
+		it('400 ao avaliar a própria empresa', async () => {
+			prisma.business.findUnique.mockResolvedValue({
+				id: 'biz-1',
+				ownerId: 'owner-1',
+			});
+
+			await expect(
+				service.create('owner-1', {
+					businessId: 'biz-1',
+					rating: 5,
+				}),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('409 se já avaliou a mesma empresa', async () => {
+			prisma.business.findUnique.mockResolvedValue({
+				id: 'biz-1',
+				ownerId: 'owner-1',
+			});
+			prisma.review.findUnique.mockResolvedValue({ id: 'r-1' });
+
+			await expect(
+				service.create('rev-1', {
+					businessId: 'biz-1',
+					rating: 5,
+				}),
+			).rejects.toThrow(ConflictException);
+		});
+
+		it('cria review de empresa com reviewee = dono', async () => {
+			prisma.business.findUnique.mockResolvedValue({
+				id: 'biz-1',
+				ownerId: 'owner-1',
+			});
+			prisma.review.findUnique.mockResolvedValue(null);
+			const created = {
+				id: 'r-biz',
+				rating: 4,
+				comment: null,
+				response: null,
+				createdAt: new Date(),
+				reviewer,
+				reviewee,
+				ad: null,
+				business: {
+					id: 'biz-1',
+					slug: 'loja',
+					name: 'Loja',
+					coverUrl: null,
+				},
+			};
+			prisma.review.create.mockResolvedValue(created);
+			prisma.user.findUnique.mockResolvedValue({
+				receivedReviews: [{ rating: 4 }],
+			});
+
+			const result = await service.create('rev-1', {
+				businessId: 'biz-1',
+				rating: 4,
+			});
+
+			expect(result.id).toBe('r-biz');
+			expect(result.ad).toBeNull();
+			expect(result.business?.id).toBe('biz-1');
+			expect(prisma.review.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						businessId: 'biz-1',
+						revieweeId: 'owner-1',
+					}),
+				}),
+			);
+			expect(prisma.user.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: { id: 'owner-1' },
+					data: { trustScore: 4 },
+				}),
+			);
+		});
 	});
 
 	describe('list', () => {
@@ -170,7 +276,7 @@ describe('ReviewsService', () => {
 
 			expect(result.total).toBe(1);
 			expect(result.items).toHaveLength(1);
-			expect(result.items[0].ad.price).toBe(100.5);
+			expect(result.items[0].ad?.price).toBe(100.5);
 			expect(prisma.review.findMany).toHaveBeenCalledWith(
 				expect.objectContaining({
 					where: expect.objectContaining({ adId: 'ad-1' }),
@@ -197,6 +303,37 @@ describe('ReviewsService', () => {
 			await expect(
 				service.respond('not-owner', 'r-1', { response: 'Obrigado' }),
 			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('dono da empresa pode responder', async () => {
+			prisma.review.findUnique.mockResolvedValue({
+				id: 'r-1',
+				ad: null,
+				business: { ownerId: 'owner-1' },
+			});
+			prisma.review.update.mockResolvedValue({
+				id: 'r-1',
+				rating: 5,
+				comment: 'Bom',
+				response: 'Obrigado',
+				createdAt: new Date(),
+				reviewer,
+				reviewee,
+				ad: null,
+				business: {
+					id: 'biz-1',
+					slug: 'loja',
+					name: 'Loja',
+					coverUrl: null,
+				},
+			});
+
+			const result = await service.respond('owner-1', 'r-1', {
+				response: 'Obrigado',
+			});
+
+			expect(result.response).toBe('Obrigado');
+			expect(result.business?.id).toBe('biz-1');
 		});
 
 		it('atualiza resposta (upsert)', async () => {

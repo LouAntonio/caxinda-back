@@ -22,6 +22,15 @@ describe('Reviews DTOs', () => {
 			).resolves.toEqual([]);
 		});
 
+		it('aceita businessId + rating válido', async () => {
+			await expect(
+				errorsOf(CreateReviewDto, {
+					businessId: '00000000-0000-7000-8000-000000000002',
+					rating: 4,
+				}),
+			).resolves.toEqual([]);
+		});
+
 		it('aceita rating + comment', async () => {
 			await expect(
 				errorsOf(CreateReviewDto, {
@@ -39,6 +48,15 @@ describe('Reviews DTOs', () => {
 			});
 			expect(errors).toHaveLength(1);
 			expect(errors[0].property).toBe('adId');
+		});
+
+		it('rejeita businessId inválido', async () => {
+			const errors = await errorsOf(CreateReviewDto, {
+				businessId: 'not-uuid',
+				rating: 5,
+			});
+			expect(errors).toHaveLength(1);
+			expect(errors[0].property).toBe('businessId');
 		});
 
 		it('rejeita rating acima de 5', async () => {
@@ -93,6 +111,14 @@ describe('Reviews DTOs', () => {
 			const errors = await errorsOf(ReviewsQueryDto, { adId: 'x' });
 			expect(errors).toHaveLength(1);
 			expect(errors[0].property).toBe('adId');
+		});
+
+		it('rejeita businessId inválido no filtro', async () => {
+			const errors = await errorsOf(ReviewsQueryDto, {
+				businessId: 'x',
+			});
+			expect(errors).toHaveLength(1);
+			expect(errors[0].property).toBe('businessId');
 		});
 	});
 });

@@ -31,6 +31,14 @@ const REVIEW_INCLUDE = {
 			price: true,
 		},
 	},
+	business: {
+		select: {
+			id: true,
+			slug: true,
+			name: true,
+			coverUrl: true,
+		},
+	},
 } as const;
 
 const USER_SELECT = {
@@ -48,6 +56,19 @@ export class ReviewsService {
 	}
 
 	async create(reviewerId: string, dto: CreateReviewDto) {
+		if (Boolean(dto.adId) === Boolean(dto.businessId)) {
+			throw new BadRequestException(
+				'Informe adId ou businessId (apenas um deles).',
+			);
+		}
+
+		if (dto.adId) {
+			return this.createAdReview(reviewerId, dto);
+		}
+		return this.createBusinessReview(reviewerId, dto);
+	}
+
+	private async createAdReview(reviewerId: string, dto: CreateReviewDto) {
 		const ad = await this.prisma.ad.findUnique({
 			where: { id: dto.adId },
 			select: { id: true, userId: true },
@@ -87,11 +108,59 @@ export class ReviewsService {
 		return this.toPublicReview(review);
 	}
 
+	private async createBusinessReview(
+		reviewerId: string,
+		dto: CreateReviewDto,
+	) {
+		const business = await this.prisma.business.findUnique({
+			where: { id: dto.businessId },
+			select: { id: true, ownerId: true },
+		});
+		if (!business) {
+			throw new NotFoundException('Empresa não encontrada.');
+		}
+		if (business.ownerId === reviewerId) {
+			throw new BadRequestException(
+				'Não é possível avaliar a sua própria empresa.',
+			);
+		}
+
+		const existing = await this.prisma.review.findUnique({
+			where: {
+				reviewerId_businessId: {
+					reviewerId,
+					businessId: business.id,
+				},
+			},
+			select: { id: true },
+		});
+		if (existing) {
+			throw new ConflictException('Você já avaliou esta empresa.');
+		}
+
+		const review = await this.prisma.review.create({
+			data: {
+				id: newId(),
+				rating: dto.rating,
+				comment: dto.comment?.trim() || null,
+				businessId: business.id,
+				reviewerId,
+				revieweeId: business.ownerId,
+			},
+			include: REVIEW_INCLUDE,
+		});
+
+		await this.refreshTrustScore(business.ownerId);
+
+		return this.toPublicReview(review);
+	}
+
 	async list(query: ReviewsQueryDto) {
 		const page = query.page ?? 1;
 		const limit = query.limit ?? 20;
 		const where: Prisma.ReviewWhereInput = {
 			...(query.adId && { adId: query.adId }),
+			...(query.businessId && { businessId: query.businessId }),
 			...(query.revieweeId && { revieweeId: query.revieweeId }),
 		};
 
@@ -121,14 +190,23 @@ export class ReviewsService {
 	) {
 		const review = await this.prisma.review.findUnique({
 			where: { id: reviewId },
-			include: { ad: { select: { userId: true } } },
+			select: {
+				id: true,
+				ad: {
+					select: { userId: true },
+				},
+				business: {
+					select: { ownerId: true },
+				},
+			},
 		});
 		if (!review) {
 			throw new NotFoundException('Avaliação não encontrada.');
 		}
-		if (review.ad.userId !== responderId) {
+		const ownerId = review.ad?.userId ?? review.business?.ownerId;
+		if (ownerId !== responderId) {
 			throw new ForbiddenException(
-				'Apenas o dono do anúncio pode responder a esta avaliação.',
+				'Apenas o dono do anúncio ou da empresa pode responder a esta avaliação.',
 			);
 		}
 
@@ -148,6 +226,7 @@ export class ReviewsService {
 				id: true,
 				reviewerId: true,
 				adId: true,
+				businessId: true,
 				revieweeId: true,
 			},
 		});
@@ -161,7 +240,9 @@ export class ReviewsService {
 		}
 
 		await this.prisma.review.delete({ where: { id: reviewId } });
-		await this.refreshAdRating(review.adId);
+		if (review.adId) {
+			await this.refreshAdRating(review.adId);
+		}
 		await this.refreshTrustScore(review.revieweeId);
 	}
 
@@ -224,7 +305,13 @@ export class ReviewsService {
 			slug: string;
 			image: string | null;
 			price: Prisma.Decimal | null;
-		};
+		} | null;
+		business: {
+			id: string;
+			slug: string;
+			name: string;
+			coverUrl: string | null;
+		} | null;
 	}) {
 		return {
 			id: review.id,
@@ -234,13 +321,16 @@ export class ReviewsService {
 			createdAt: review.createdAt,
 			reviewer: review.reviewer,
 			reviewee: review.reviewee,
-			ad: {
-				...review.ad,
-				price:
-					review.ad.price === null
-						? null
-						: review.ad.price.toNumber(),
-			},
+			ad: review.ad
+				? {
+						...review.ad,
+						price:
+							review.ad.price === null
+								? null
+								: review.ad.price.toNumber(),
+					}
+				: null,
+			business: review.business,
 		};
 	}
 }

@@ -7,11 +7,13 @@ import {
 	Param,
 	Patch,
 	Post,
+	Query,
 	UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermission } from '../auth/decorators/roles.decorator';
+import { CategoryType } from '../generated/prisma/client';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './categories.dto';
 
@@ -22,8 +24,8 @@ export class CategoriesController {
 
 	@Get()
 	@ApiOperation({ summary: 'Listar categorias (público)' })
-	async list() {
-		return this.categoriesService.list();
+	async list(@Query('type') type?: CategoryType) {
+		return this.categoriesService.list(type);
 	}
 
 	@Get(':slug')

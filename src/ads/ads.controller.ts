@@ -111,12 +111,14 @@ export class AdsController {
 	}
 
 	@Post()
-	@ApiOperation({ summary: 'Criar anúncio' })
+	@ApiOperation({
+		summary: 'Criar anúncio (MODERATOR/ADMIN)',
+	})
 	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['create'] })
 	async create(@Req() req: Request, @Body() dto: CreateAdDto) {
 		const user = await this.requireUser(req);
-		return this.adsService.create(user.id, dto);
+		return this.adsService.create(user.id, user.role, dto);
 	}
 
 	@Patch(':id')

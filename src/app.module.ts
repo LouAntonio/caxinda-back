@@ -8,6 +8,7 @@ import { AdsModule } from './ads/ads.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { BusinessModule } from './business/business.module';
 import { CacheModule } from './cache/cache.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ChatsModule } from './chat/chat.module';
@@ -55,6 +56,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
 		CacheModule,
 		AuthModule,
 		AdsModule,
+		BusinessModule,
 		CategoriesModule,
 		ChatsModule,
 		KycModule,

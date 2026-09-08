@@ -66,11 +66,6 @@ export const auth = betterAuth({
 				required: false,
 				input: true,
 			},
-			province: {
-				type: 'string',
-				required: false,
-				input: true,
-			},
 		},
 	},
 	advanced: {

@@ -151,7 +151,7 @@ describe('AdsController', () => {
 		);
 	});
 
-	it('create resolve a sessão e delega com userId', async () => {
+	it('create resolve a sessão e delega com userId e role', async () => {
 		const req = mockRequest();
 		const dto = {
 			title: 'iPhone',
@@ -161,7 +161,7 @@ describe('AdsController', () => {
 
 		await controller.create(req, dto);
 
-		expect(service.create).toHaveBeenCalledWith('u1', dto);
+		expect(service.create).toHaveBeenCalledWith('u1', 'USER', dto);
 	});
 
 	it('update repassa userId, role e dto', async () => {

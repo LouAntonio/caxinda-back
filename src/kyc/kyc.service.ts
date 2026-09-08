@@ -139,9 +139,14 @@ export class KycService {
 			},
 		});
 
+		const promoted = dto.status === 'APPROVED';
+
 		await this.prisma.user.update({
 			where: { id: updated.userId },
-			data: { isVerified: dto.status === 'APPROVED' },
+			data: {
+				isVerified: promoted,
+				role: promoted ? 'PROMOTER' : 'USER',
+			},
 		});
 
 		await this.sendKycEmail(dto, updated.userId);
@@ -168,6 +173,7 @@ export class KycService {
 			data: {
 				banned: true,
 				isVerified: false,
+				role: 'USER',
 			},
 		});
 

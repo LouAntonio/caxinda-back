@@ -11,7 +11,6 @@ import { CacheService } from '../cache/cache.service';
 import { MediaService } from '../media/media.service';
 import { newId } from '../libs/id';
 import {
-	AD_TYPES,
 	AdminListAdsQueryDto,
 	AdQueryDto,
 	CreateAdDto,
@@ -33,13 +32,11 @@ interface CacheableAd {
 	title: string;
 	description: string;
 	price: string | null;
-	type: string;
 	status: string;
 	visibility: string;
 	verified: boolean;
 	createdAt: Date;
 	updatedAt: Date;
-	tradefor: string[];
 	averageRating: number | null;
 	reviewCount: number;
 	featured: boolean;
@@ -65,9 +62,6 @@ const AD_INCLUDE = {
 			image: true,
 			trustScore: true,
 			isVerified: true,
-			city: true,
-			neighborhood: true,
-			subscriptionTier: true,
 		},
 	},
 } as const;
@@ -138,22 +132,6 @@ export class AdsService {
 			where.featuredUntil = { gt: new Date() };
 		}
 
-		if (query.type) {
-			const types = query.type
-				.split(',')
-				.map((t) => t.trim().toUpperCase())
-				.filter((t) => (AD_TYPES as readonly string[]).includes(t));
-			if (types.length === 1) {
-				where.type = types[0] as [
-					'SALE' | 'TRADE' | 'DONATION',
-				][number];
-			} else if (types.length > 1) {
-				where.type = {
-					in: types as ['SALE' | 'TRADE' | 'DONATION'][number][],
-				};
-			}
-		}
-
 		if (query.categorySlugs) {
 			const slugs = query.categorySlugs
 				.split(',')
@@ -187,15 +165,6 @@ export class AdsService {
 			where.price = {
 				...(query.minPrice !== undefined && { gte: query.minPrice }),
 				...(query.maxPrice !== undefined && { lte: query.maxPrice }),
-			};
-		}
-
-		if (query.city || query.neighborhood) {
-			where.user = {
-				...(query.city && { city: query.city }),
-				...(query.neighborhood && {
-					neighborhood: query.neighborhood,
-				}),
 			};
 		}
 
@@ -269,9 +238,6 @@ export class AdsService {
 		const where: Prisma.AdWhereInput = {};
 		if (query.status) {
 			where.status = query.status;
-		}
-		if (query.type) {
-			where.type = query.type;
 		}
 		if (query.visibility) {
 			where.visibility = query.visibility;
@@ -577,15 +543,10 @@ export class AdsService {
 		});
 	}
 
-	async create(userId: string, dto: CreateAdDto) {
-		const author = await this.prisma.user.findUnique({
-			where: { id: userId },
-			select: { kyc: { select: { status: true } } },
-		});
-
-		if (!author || author.kyc?.status !== 'APPROVED') {
+	async create(userId: string, viewerRole: string, dto: CreateAdDto) {
+		if (!this.isPrivileged({ id: userId, role: viewerRole })) {
 			throw new ForbiddenException(
-				'Para publicar um anúncio é necessário ter a identidade verificada (KYC aprovado).',
+				'Apenas administradores e moderadores podem criar anúncios.',
 			);
 		}
 
@@ -597,8 +558,6 @@ export class AdsService {
 
 		await this.assertCategoriesExist(dto.categoryIds);
 
-		const type = dto.type ?? 'SALE';
-		this.assertTradeforRules(type, dto.tradefor);
 		const slug = await this.createSlug(dto.slug, dto.title);
 
 		const ad = await this.prisma.ad.create({
@@ -609,8 +568,6 @@ export class AdsService {
 				title: dto.title,
 				description: dto.description,
 				price: dto.price,
-				type,
-				tradefor: type === 'TRADE' ? (dto.tradefor ?? []) : [],
 				image: dto.image,
 				imageId: dto.imageId,
 				gallery: (dto.gallery ??
@@ -643,9 +600,7 @@ export class AdsService {
 			await this.assertCategoriesExist(dto.categoryIds);
 		}
 
-		const finalType = dto.type ?? ad.type;
 		const slug = await this.updateSlug(ad, dto);
-		const tradefor = this.resolveTradeforUpdate(ad, dto, finalType);
 
 		const updated = await this.prisma.ad.update({
 			where: { id },
@@ -654,8 +609,6 @@ export class AdsService {
 				title: dto.title,
 				description: dto.description,
 				price: dto.price,
-				type: dto.type,
-				tradefor,
 				image: dto.image,
 				imageId: dto.imageId,
 				gallery:
@@ -815,7 +768,7 @@ export class AdsService {
 	private async assertCategoriesExist(categoryIds: string[]) {
 		const unique = Array.from(new Set(categoryIds));
 		const found = await this.prisma.category.findMany({
-			where: { id: { in: unique } },
+			where: { id: { in: unique }, type: 'AD' },
 			select: { id: true },
 		});
 
@@ -824,45 +777,6 @@ export class AdsService {
 				'Uma ou mais categorias informadas não existem.',
 			);
 		}
-	}
-
-	private assertTradeforRules(type: string, tradefor?: string[]) {
-		if (type === 'TRADE') {
-			if (!tradefor || tradefor.length === 0) {
-				throw new BadRequestException(
-					'Anúncios do tipo TRADE devem informar tradefor.',
-				);
-			}
-			return;
-		}
-		if (tradefor) {
-			throw new BadRequestException(
-				'tradefor só é válido para anúncios do tipo TRADE.',
-			);
-		}
-	}
-
-	private resolveTradeforUpdate(
-		ad: { type: string; tradefor: string[] },
-		dto: UpdateAdDto,
-		finalType: string,
-	): string[] | undefined {
-		if (finalType === 'TRADE') {
-			if (dto.tradefor !== undefined) {
-				this.assertTradeforRules('TRADE', dto.tradefor);
-				return dto.tradefor;
-			}
-			if (dto.type !== undefined && dto.type !== ad.type) {
-				throw new BadRequestException(
-					'Ao mudar para type=TRADE informe tradefor.',
-				);
-			}
-			return undefined;
-		}
-		if (dto.tradefor !== undefined) {
-			this.assertTradeforRules('SALE', dto.tradefor);
-		}
-		return ad.tradefor.length ? [] : undefined;
 	}
 
 	private async isSlugTaken(
@@ -956,11 +870,9 @@ export class AdsService {
 			title: string;
 			description: string;
 			price: Prisma.Decimal | null;
-			type: string;
 			status: string;
 			visibility: string;
 			verified: boolean;
-			tradefor: string[];
 			createdAt: Date;
 			updatedAt: Date;
 			image: string | null;
@@ -980,11 +892,9 @@ export class AdsService {
 			title: ad.title,
 			description: ad.description,
 			price: ad.price === null ? null : ad.price.toNumber(),
-			type: ad.type,
 			status: ad.status,
 			visibility: ad.visibility,
 			verified: ad.verified,
-			tradefor: ad.tradefor,
 			createdAt: ad.createdAt,
 			updatedAt: ad.updatedAt,
 			image: ad.image,

@@ -49,9 +49,15 @@ describe('CategoriesController', () => {
 	});
 
 	it('list delega ao service', async () => {
-		await controller.list();
+		await controller.list(undefined);
 
-		expect(service.list).toHaveBeenCalledWith();
+		expect(service.list).toHaveBeenCalledWith(undefined);
+	});
+
+	it('list repassa o tipo quando informado', async () => {
+		await controller.list('BUSINESS');
+
+		expect(service.list).toHaveBeenCalledWith('BUSINESS');
 	});
 
 	it('getBySlug delega com o slug', async () => {

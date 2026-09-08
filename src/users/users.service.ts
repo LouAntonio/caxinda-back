@@ -11,7 +11,6 @@ import { auth } from '../libs/auth';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { EmailService } from '../email/email.service';
 import { MagicLinkService } from '../auth/magic-link.service';
-import { normalizeIban } from '../libs/iban';
 import {
 	BanUserDto,
 	CreateUserDto,
@@ -147,7 +146,6 @@ export class UsersService {
 			subscriptions: subscriptions.map((sub) => ({
 				id: sub.id,
 				planId: sub.planId,
-				tier: sub.tier,
 				status: sub.status,
 				startDate: sub.startDate,
 				endDate: sub.endDate,
@@ -172,10 +170,6 @@ export class UsersService {
 				banned: true,
 				trustScore: true,
 				isVerified: true,
-				subscriptionTier: true,
-				neighborhood: true,
-				city: true,
-				province: true,
 				createdAt: true,
 				kyc: { select: { verifiedAt: true } },
 			},
@@ -193,10 +187,6 @@ export class UsersService {
 			trustScore: user.trustScore,
 			isVerified: user.isVerified,
 			verifiedAt: user.kyc?.verifiedAt ?? null,
-			subscriptionTier: user.subscriptionTier,
-			neighborhood: user.neighborhood,
-			city: user.city,
-			province: user.province,
 			createdAt: user.createdAt,
 		};
 	}
@@ -226,16 +216,7 @@ export class UsersService {
 				name: dto.name,
 				surname: dto.surname,
 				phone: dto.phone,
-				neighborhood: dto.neighborhood,
-				city: dto.city,
-				province: dto.province,
 				image: dto.image,
-				bankName: dto.bankName,
-				bankHolder: dto.bankHolder,
-				bankIban:
-					dto.bankIban === undefined
-						? undefined
-						: normalizeIban(dto.bankIban),
 			},
 		});
 
@@ -258,10 +239,6 @@ export class UsersService {
 							isVerified: true,
 							phone: true,
 							trustScore: true,
-							province: true,
-							bankName: true,
-							bankHolder: true,
-							bankIban: true,
 							kyc: { select: { status: true } },
 						},
 					})
@@ -289,17 +266,6 @@ export class UsersService {
 						phone: enriched?.phone ?? null,
 						trustScore: enriched?.trustScore ?? 0,
 						isVerified: enriched?.isVerified ?? false,
-						subscriptionTier:
-							(user as { subscriptionTier?: string })
-								.subscriptionTier ?? 'FREE',
-						neighborhood:
-							(user as { neighborhood?: string | null })
-								.neighborhood ?? null,
-						city: (user as { city?: string | null }).city ?? null,
-						province: enriched?.province ?? null,
-						bankName: enriched?.bankName ?? null,
-						bankHolder: enriched?.bankHolder ?? null,
-						bankIban: enriched?.bankIban ?? null,
 						createdAt: user.createdAt,
 						updatedAt: user.updatedAt,
 						kyc: enriched?.kyc ?? null,
@@ -522,7 +488,7 @@ export class UsersService {
 		});
 		await this.prisma.user.update({
 			where: { id: userId },
-			data: { isVerified: false },
+			data: { isVerified: false, role: 'USER' },
 		});
 	}
 
@@ -540,13 +506,6 @@ export class UsersService {
 		phone: string | null;
 		trustScore: number;
 		isVerified: boolean;
-		subscriptionTier: string;
-		neighborhood: string | null;
-		city: string | null;
-		province: string | null;
-		bankName: string | null | undefined;
-		bankHolder: string | null | undefined;
-		bankIban: string | null | undefined;
 		createdAt: Date;
 		updatedAt: Date;
 		kyc?: { status: string } | null;
@@ -565,13 +524,6 @@ export class UsersService {
 			phone: user.phone,
 			trustScore: user.trustScore,
 			isVerified: user.isVerified,
-			subscriptionTier: user.subscriptionTier,
-			neighborhood: user.neighborhood,
-			city: user.city,
-			province: user.province,
-			bankName: user.bankName ?? null,
-			bankHolder: user.bankHolder ?? null,
-			bankIban: user.bankIban ?? null,
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt,
 			kyc: user.kyc ? { status: user.kyc.status } : null,

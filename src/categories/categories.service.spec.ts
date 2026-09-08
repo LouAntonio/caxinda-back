@@ -37,7 +37,8 @@ describe('CategoriesService', () => {
 		id: 'cat-1',
 		slug: 'eletronica',
 		name: 'Eletrónica',
-		_count: { ads: 3 },
+		type: 'AD',
+		_count: { ads: 3, businesses: 0 },
 	};
 
 	const cache = {
@@ -72,23 +73,43 @@ describe('CategoriesService', () => {
 	});
 
 	describe('list', () => {
-		it('ordena por nome e inclui adCount', async () => {
+		it('ordena por nome e inclui adCount e businessCount', async () => {
 			prisma.category.findMany.mockResolvedValue([categoryRow]);
 
 			const result = await service.list();
 
 			expect(prisma.category.findMany).toHaveBeenCalledWith({
+				where: undefined,
 				orderBy: [{ name: 'asc' }],
-				include: { _count: { select: { ads: true } } },
+				include: {
+					_count: { select: { ads: true, businesses: true } },
+				},
 			});
 			expect(result).toEqual([
 				{
 					id: 'cat-1',
 					slug: 'eletronica',
 					name: 'Eletrónica',
+					type: 'AD',
 					adCount: 3,
+					businessCount: 0,
 				},
 			]);
+		});
+
+		it('filtra por tipo quando informado', async () => {
+			prisma.category.findMany.mockResolvedValue([categoryRow]);
+
+			const result = await service.list('BUSINESS');
+
+			expect(prisma.category.findMany).toHaveBeenCalledWith({
+				where: { type: 'BUSINESS' },
+				orderBy: [{ name: 'asc' }],
+				include: {
+					_count: { select: { ads: true, businesses: true } },
+				},
+			});
+			expect(result).toHaveLength(1);
 		});
 	});
 
@@ -99,8 +120,11 @@ describe('CategoriesService', () => {
 			const result = await service.getBySlug('eletronica');
 
 			expect(prisma.category.findMany).toHaveBeenCalledWith({
+				where: undefined,
 				orderBy: [{ name: 'asc' }],
-				include: { _count: { select: { ads: true } } },
+				include: {
+					_count: { select: { ads: true, businesses: true } },
+				},
 			});
 			expect(result.adCount).toBe(3);
 		});
@@ -128,9 +152,27 @@ describe('CategoriesService', () => {
 				data: expect.objectContaining({
 					slug: 'eletronica',
 					name: 'Eletrónica',
+					type: 'AD',
 				}),
 			});
 			expect(result.slug).toBe('eletronica');
+		});
+
+		it('usa o tipo informado quando fornecido', async () => {
+			prisma.category.findUnique.mockResolvedValue(null);
+			prisma.category.create.mockResolvedValue({
+				...categoryRow,
+				type: 'BUSINESS',
+			});
+
+			await service.create({
+				name: 'Restaurantes',
+				type: 'BUSINESS',
+			});
+
+			expect(prisma.category.create).toHaveBeenCalledWith({
+				data: expect.objectContaining({ type: 'BUSINESS' }),
+			});
 		});
 
 		it('usa o slug informado quando existe', async () => {

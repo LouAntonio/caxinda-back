@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../common/prisma/prisma.module';
 import { CacheService } from '../cache/cache.service';
 import { Prisma } from '../generated/prisma/client';
+import { CategoryType } from '../generated/prisma/client';
 import { newId } from '../libs/id';
 import { CreateCategoryDto, UpdateCategoryDto } from './categories.dto';
 
@@ -46,20 +47,27 @@ export class CategoriesService {
 		private readonly cache: CacheService,
 	) {}
 
-	async list() {
+	async list(type?: CategoryType) {
+		const key = type ? `categories:${type}` : this.LIST_KEY;
+
 		return this.cache.wrap(
-			this.LIST_KEY,
+			key,
 			async () => {
 				const categories = await this.prisma.category.findMany({
+					where: type ? { type } : undefined,
 					orderBy: [{ name: 'asc' }],
-					include: { _count: { select: { ads: true } } },
+					include: {
+						_count: { select: { ads: true, businesses: true } },
+					},
 				});
 
 				return categories.map((category) => ({
 					id: category.id,
 					slug: category.slug,
 					name: category.name,
+					type: category.type,
 					adCount: category._count.ads,
+					businessCount: category._count.businesses,
 				}));
 			},
 			this.TTL_MS,
@@ -98,6 +106,7 @@ export class CategoriesService {
 					id: newId(),
 					slug,
 					name: dto.name,
+					type: dto.type ?? 'AD',
 				},
 			});
 		} catch (error) {
@@ -135,9 +144,10 @@ export class CategoriesService {
 				data: {
 					name: dto.name,
 					slug,
+					type: dto.type,
 				},
 			});
-			await this.cache.del(this.LIST_KEY);
+			await this.invalidateCache();
 			return updated;
 		} catch (error) {
 			if (isUniqueViolation(error)) {
@@ -159,11 +169,11 @@ export class CategoriesService {
 
 		try {
 			await this.prisma.category.delete({ where: { id } });
-			await this.cache.del(this.LIST_KEY);
+			await this.invalidateCache();
 		} catch (error) {
 			if (isForeignKeyViolation(error)) {
 				throw new ConflictException(
-					'Não é possível remover uma categoria que possui anúncios.',
+					'Não é possível remover uma categoria que possui anúncios ou empresas.',
 				);
 			}
 			throw error;
@@ -172,5 +182,12 @@ export class CategoriesService {
 
 	private async findBySlug(slug: string) {
 		return this.prisma.category.findUnique({ where: { slug } });
+	}
+
+	private async invalidateCache() {
+		await this.cache.delMany([
+			this.LIST_KEY,
+			...Object.values(CategoryType).map((type) => `categories:${type}`),
+		]);
 	}
 }

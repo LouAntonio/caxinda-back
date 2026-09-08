@@ -16,21 +16,13 @@ import {
 	Max,
 	MaxLength,
 	Min,
-	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-export const AD_TYPES = ['SALE', 'TRADE', 'DONATION'] as const;
-export const AD_STATUSES = [
-	'ACTIVE',
-	'SOLD',
-	'TRADED',
-	'ARCHIVED',
-	'REJECTED',
-] as const;
+export const AD_STATUSES = ['ACTIVE', 'SOLD', 'ARCHIVED', 'REJECTED'] as const;
 export const AD_VISIBILITIES = ['VISIBLE', 'HIDDEN'] as const;
 export const AD_SORTS = [
 	'newest',
@@ -98,11 +90,6 @@ export class CreateAdDto {
 	@Min(0)
 	price?: number;
 
-	@ApiPropertyOptional({ enum: AD_TYPES, default: 'SALE' })
-	@IsOptional()
-	@IsIn(AD_TYPES, { message: 'type inválido' })
-	type?: (typeof AD_TYPES)[number];
-
 	@ApiPropertyOptional({
 		example: 'iphone-12-64gb',
 		description:
@@ -116,27 +103,6 @@ export class CreateAdDto {
 			'slug deve conter apenas letras minúsculas, números e hífens sem espaços',
 	})
 	slug?: string;
-
-	@ApiPropertyOptional({
-		type: [String],
-		example: ['cadeira de escritório', 'monitor 24"'],
-		description:
-			'Obrigatório quando type=TRADE. Pelo que o dono está disposto a trocar.',
-	})
-	@ValidateIf((object: CreateAdDto) => object.type === 'TRADE')
-	@IsArray({ message: 'tradefor deve ser um array' })
-	@ArrayMinSize(1, { message: 'informe ao menos um item para troca' })
-	@ArrayMaxSize(10, { message: 'no máximo 10 itens para troca' })
-	@IsString({ each: true })
-	@IsNotEmpty({
-		each: true,
-		message: 'itens de tradefor não podem ser vazios',
-	})
-	@MaxLength(80, {
-		each: true,
-		message: 'cada item deve ter no máximo 80 caracteres',
-	})
-	tradefor?: string[];
 
 	@ApiProperty({
 		type: [String],
@@ -200,11 +166,6 @@ export class UpdateAdDto {
 	@Min(0)
 	price?: number;
 
-	@ApiPropertyOptional({ enum: AD_TYPES })
-	@IsOptional()
-	@IsIn(AD_TYPES)
-	type?: (typeof AD_TYPES)[number];
-
 	@ApiPropertyOptional({
 		example: 'iphone-12-64gb',
 		description:
@@ -218,26 +179,6 @@ export class UpdateAdDto {
 			'slug deve conter apenas letras minúsculas, números e hífens sem espaços',
 	})
 	slug?: string;
-
-	@ApiPropertyOptional({
-		type: [String],
-		description:
-			'Obrigatório quando type=TRADE; limpo automaticamente se o type deixar de ser TRADE',
-	})
-	@ValidateIf((object: UpdateAdDto) => object.type === 'TRADE')
-	@IsArray({ message: 'tradefor deve ser um array' })
-	@ArrayMinSize(1, { message: 'informe ao menos um item para troca' })
-	@ArrayMaxSize(10, { message: 'no máximo 10 itens para troca' })
-	@IsString({ each: true })
-	@IsNotEmpty({
-		each: true,
-		message: 'itens de tradefor não podem ser vazios',
-	})
-	@MaxLength(80, {
-		each: true,
-		message: 'cada item deve ter no máximo 80 caracteres',
-	})
-	tradefor?: string[];
 
 	@ApiPropertyOptional({
 		type: [String],
@@ -315,16 +256,6 @@ export class AdQueryDto {
 	sortBy?: (typeof AD_SORTS)[number];
 
 	@ApiPropertyOptional({
-		description:
-			'Tipo(s) separados por vírgula (ex.: SALE ou SALE,TRADE). Vazio/omitido = todos',
-		example: 'SALE,TRADE',
-	})
-	@IsOptional()
-	@IsString()
-	@MaxLength(60)
-	type?: string;
-
-	@ApiPropertyOptional({
 		description: 'IDs de categoria separados por vírgula (ex.: a,b,c)',
 	})
 	@IsOptional()
@@ -358,16 +289,6 @@ export class AdQueryDto {
 	@IsNumber()
 	@Min(0)
 	maxPrice?: number;
-
-	@ApiPropertyOptional()
-	@IsOptional()
-	@IsString()
-	city?: string;
-
-	@ApiPropertyOptional()
-	@IsOptional()
-	@IsString()
-	neighborhood?: string;
 
 	@ApiPropertyOptional({
 		description: 'Listar também inativos/ocultos (apenas MODERATOR/ADMIN)',
@@ -461,11 +382,6 @@ export class AdminListAdsQueryDto {
 	@IsOptional()
 	@IsIn(AD_STATUSES)
 	status?: (typeof AD_STATUSES)[number];
-
-	@ApiPropertyOptional({ enum: AD_TYPES })
-	@IsOptional()
-	@IsIn(AD_TYPES)
-	type?: (typeof AD_TYPES)[number];
 
 	@ApiPropertyOptional({ enum: ['VISIBLE', 'HIDDEN'] })
 	@IsOptional()

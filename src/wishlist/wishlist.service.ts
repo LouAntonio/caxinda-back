@@ -15,7 +15,6 @@ const AD_SELECT = {
 	title: true,
 	description: true,
 	price: true,
-	type: true,
 	status: true,
 	visibility: true,
 	verified: true,
@@ -126,7 +125,6 @@ export class WishlistService {
 		title: string;
 		description: string;
 		price: Prisma.Decimal | null;
-		type: string;
 		status: string;
 		visibility: string;
 		verified: boolean;
@@ -152,7 +150,6 @@ export class WishlistService {
 			title: ad.title,
 			description: ad.description,
 			price: ad.price === null ? null : ad.price.toNumber(),
-			type: ad.type,
 			status: ad.status,
 			visibility: ad.visibility,
 			verified: ad.verified,

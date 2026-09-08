@@ -36,7 +36,6 @@ const AD_SELECT = {
 	slug: true,
 	image: true,
 	price: true,
-	type: true,
 } as const;
 
 @Injectable()
@@ -51,7 +50,6 @@ export class ChatsService {
 				userId: true,
 				status: true,
 				visibility: true,
-				type: true,
 			},
 		});
 
@@ -67,19 +65,6 @@ export class ChatsService {
 			throw new BadRequestException(
 				'Este anúncio não está disponível para conversa.',
 			);
-		}
-
-		// Trocar / receber doação exige identidade verificada (KYC aprovado).
-		if (ad.type === 'TRADE' || ad.type === 'DONATION') {
-			const viewer = await this.prisma.user.findUnique({
-				where: { id: userId },
-				select: { kyc: { select: { status: true } } },
-			});
-			if (!viewer || viewer.kyc?.status !== 'APPROVED') {
-				throw new ForbiddenException(
-					'Para trocar ou receber itens em doação é necessário ter a identidade verificada (KYC aprovado).',
-				);
-			}
 		}
 
 		const existing = await this.prisma.conversation.findFirst({
@@ -413,7 +398,6 @@ export class ChatsService {
 				slug: string;
 				image: string | null;
 				price: Prisma.Decimal | null;
-				type: string;
 			};
 			participants: {
 				user: {

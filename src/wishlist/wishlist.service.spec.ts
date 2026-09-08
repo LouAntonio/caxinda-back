@@ -118,7 +118,6 @@ describe('WishlistService', () => {
 						title: 'iPhone',
 						description: 'd',
 						price: new Prisma.Decimal('900'),
-						type: 'SALE',
 						status: 'ACTIVE',
 						visibility: 'VISIBLE',
 						verified: true,

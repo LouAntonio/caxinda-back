@@ -12,7 +12,6 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ALL_ROLES } from '../auth/roles';
-import { IsIBAN } from '../libs/iban';
 
 export class UpdateProfileDto {
 	@ApiPropertyOptional()
@@ -36,43 +35,8 @@ export class UpdateProfileDto {
 	@ApiPropertyOptional()
 	@IsOptional()
 	@IsString()
-	@MaxLength(120)
-	neighborhood?: string;
-
-	@ApiPropertyOptional()
-	@IsOptional()
-	@IsString()
-	@MaxLength(120)
-	city?: string;
-
-	@ApiPropertyOptional()
-	@IsOptional()
-	@IsString()
-	@MaxLength(120)
-	province?: string;
-
-	@ApiPropertyOptional()
-	@IsOptional()
-	@IsString()
 	@MaxLength(2048)
 	image?: string;
-
-	@ApiPropertyOptional({ description: 'Banco para receber o pagamento' })
-	@IsOptional()
-	@IsString()
-	@MaxLength(120)
-	bankName?: string;
-
-	@ApiPropertyOptional({ description: 'Nome do titular da conta' })
-	@IsOptional()
-	@IsString()
-	@MaxLength(120)
-	bankHolder?: string;
-
-	@ApiPropertyOptional({ description: 'IBAN' })
-	@IsOptional()
-	@IsIBAN()
-	bankIban?: string;
 }
 
 export class CreateUserDto {

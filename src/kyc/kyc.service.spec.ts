@@ -192,7 +192,7 @@ describe('KycService', () => {
 			expect(result.status).toBe('APPROVED');
 			expect(prisma.user.update).toHaveBeenCalledWith({
 				where: { id: 'user-id' },
-				data: { isVerified: true },
+				data: { isVerified: true, role: 'PROMOTER' },
 			});
 			expect(emailService.enqueue).toHaveBeenCalledWith(
 				expect.objectContaining({ subject: 'Seu KYC foi aprovado' }),
@@ -217,6 +217,10 @@ describe('KycService', () => {
 			});
 
 			expect(result.status).toBe('REJECTED');
+			expect(prisma.user.update).toHaveBeenCalledWith({
+				where: { id: 'user-id' },
+				data: { isVerified: false, role: 'USER' },
+			});
 			expect(emailService.enqueue).toHaveBeenCalledWith(
 				expect.objectContaining({ subject: 'Seu KYC foi recusado' }),
 			);
@@ -256,7 +260,7 @@ describe('KycService', () => {
 			);
 			expect(prisma.user.update).toHaveBeenCalledWith({
 				where: { id: 'user-id' },
-				data: { banned: true, isVerified: false },
+				data: { banned: true, isVerified: false, role: 'USER' },
 			});
 			expect(emailService.enqueue).toHaveBeenCalledWith(
 				expect.objectContaining({ subject: 'Sua conta foi banida' }),

@@ -123,8 +123,7 @@ describe('Users DTOs', () => {
 				name: 'João',
 				surname: 'Silva',
 				phone: '+55 11 99999-9999',
-				city: 'São Paulo',
-				neighborhood: 'Centro',
+				image: 'https://cdn.test/avatar.jpg',
 			});
 
 			expect(errors).toEqual([]);

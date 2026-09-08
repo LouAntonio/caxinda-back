@@ -91,7 +91,7 @@ describe('UsersController', () => {
 
 	it('updateMe repassa o dto de perfil', async () => {
 		const req = mockRequest();
-		const dto = { city: 'São Paulo', phone: '+55 11 99999-9999' };
+		const dto = { phone: '+55 11 99999-9999' };
 
 		await controller.updateMe(req, dto);
 

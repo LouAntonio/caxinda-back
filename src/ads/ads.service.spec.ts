@@ -65,11 +65,9 @@ describe('AdsService', () => {
 			toNumber: () => 250000,
 			toJSON: () => '250000',
 		} as unknown as Prisma.Decimal,
-		type: 'SALE',
 		status: 'ACTIVE',
 		visibility: 'VISIBLE',
 		verified: false,
-		tradefor: [],
 		createdAt: new Date('2026-01-01T00:00:00Z'),
 		updatedAt: new Date('2026-01-01T00:00:00Z'),
 		image: null,
@@ -90,11 +88,9 @@ describe('AdsService', () => {
 			title: adRow.title,
 			description: adRow.description,
 			price: 250000,
-			type: 'SALE',
 			status: 'ACTIVE',
 			visibility: 'VISIBLE',
 			verified: false,
-			tradefor: [],
 			createdAt: adRow.createdAt,
 			updatedAt: adRow.updatedAt,
 			image: null,
@@ -231,7 +227,7 @@ describe('AdsService', () => {
 			);
 		});
 
-		it('filtra por preço, cidade e bairro', async () => {
+		it('filtra por preço', async () => {
 			prisma.ad.count.mockResolvedValue(0);
 			prisma.ad.findMany.mockResolvedValue([]);
 
@@ -239,8 +235,6 @@ describe('AdsService', () => {
 				{
 					minPrice: 100,
 					maxPrice: 500,
-					city: 'Luanda',
-					neighborhood: 'Maianga',
 				},
 				null,
 			);
@@ -249,10 +243,6 @@ describe('AdsService', () => {
 				expect.objectContaining({
 					where: expect.objectContaining({
 						price: { gte: 100, lte: 500 },
-						user: {
-							city: 'Luanda',
-							neighborhood: 'Maianga',
-						},
 					}),
 				}),
 			);
@@ -599,20 +589,9 @@ describe('AdsService', () => {
 			categoryIds: ['cat-1', 'cat-2'],
 		};
 
-		beforeEach(() => {
-			prisma.user.findUnique.mockResolvedValue({
-				kyc: { status: 'APPROVED' },
-			});
-		});
-
-		it('bloqueia criação sem KYC aprovado', async () => {
-			prisma.user.findUnique.mockResolvedValue({
-				kyc: { status: 'PENDING' },
-			});
-			prisma.category.findMany.mockResolvedValue([{ id: 'cat-1' }]);
-
+		it('bloqueia criação por usuário comum', async () => {
 			await expect(
-				service.create('owner-id', dto),
+				service.create('owner-id', 'USER', dto),
 			).rejects.toBeInstanceOf(ForbiddenException);
 			expect(prisma.ad.create).not.toHaveBeenCalled();
 		});
@@ -624,18 +603,17 @@ describe('AdsService', () => {
 			]);
 			prisma.ad.create.mockResolvedValue(adRow);
 
-			const result = await service.create('owner-id', dto);
+			const result = await service.create('admin-id', 'ADMIN', dto);
 
 			expect(prisma.category.findMany).toHaveBeenCalledWith({
-				where: { id: { in: ['cat-1', 'cat-2'] } },
+				where: { id: { in: ['cat-1', 'cat-2'] }, type: 'AD' },
 				select: { id: true },
 			});
 			expect(prisma.ad.create).toHaveBeenCalledWith(
 				expect.objectContaining({
 					data: expect.objectContaining({
-						userId: 'owner-id',
+						userId: 'admin-id',
 						title: 'iPhone 12',
-						type: 'SALE',
 						categories: {
 							connect: [{ id: 'cat-1' }, { id: 'cat-2' }],
 						},
@@ -652,7 +630,7 @@ describe('AdsService', () => {
 			prisma.$executeRaw.mockResolvedValue(1);
 
 			await expect(
-				service.create('owner-id', {
+				service.create('admin-id', 'ADMIN', {
 					...dto,
 					categoryIds: ['cat-1'],
 					location: { lat: -8.8, lng: 13.2 },
@@ -666,7 +644,7 @@ describe('AdsService', () => {
 			prisma.category.findMany.mockResolvedValue([{ id: 'cat-1' }]);
 
 			await expect(
-				service.create('owner-id', dto),
+				service.create('admin-id', 'ADMIN', dto),
 			).rejects.toBeInstanceOf(BadRequestException);
 			expect(prisma.ad.create).not.toHaveBeenCalled();
 		});
@@ -675,7 +653,7 @@ describe('AdsService', () => {
 			prisma.category.findMany.mockResolvedValue([{ id: 'cat-1' }]);
 			prisma.ad.create.mockResolvedValue(adRow);
 
-			await service.create('owner-id', {
+			await service.create('admin-id', 'ADMIN', {
 				...dto,
 				categoryIds: ['cat-1'],
 			});
@@ -684,7 +662,6 @@ describe('AdsService', () => {
 				expect.objectContaining({
 					data: expect.objectContaining({
 						slug: 'iphone-12',
-						tradefor: [],
 					}),
 				}),
 			);
@@ -697,7 +674,7 @@ describe('AdsService', () => {
 				.mockResolvedValueOnce({ id: 'outro-id' })
 				.mockResolvedValueOnce(null);
 
-			await service.create('owner-id', {
+			await service.create('admin-id', 'ADMIN', {
 				...dto,
 				categoryIds: ['cat-1'],
 			});
@@ -713,7 +690,7 @@ describe('AdsService', () => {
 			prisma.category.findMany.mockResolvedValue([{ id: 'cat-1' }]);
 			prisma.ad.create.mockResolvedValue(adRow);
 
-			await service.create('owner-id', {
+			await service.create('admin-id', 'ADMIN', {
 				...dto,
 				categoryIds: ['cat-1'],
 				slug: 'meu-iphone',
@@ -731,60 +708,13 @@ describe('AdsService', () => {
 			prisma.ad.findUnique.mockResolvedValue({ id: 'outro-id' });
 
 			await expect(
-				service.create('owner-id', {
+				service.create('admin-id', 'ADMIN', {
 					...dto,
 					categoryIds: ['cat-1'],
 					slug: 'taken',
 				}),
 			).rejects.toBeInstanceOf(ConflictException);
 			expect(prisma.ad.create).not.toHaveBeenCalled();
-		});
-
-		it('exige tradefor quando type=TRADE', async () => {
-			prisma.category.findMany.mockResolvedValue([{ id: 'cat-1' }]);
-
-			await expect(
-				service.create('owner-id', {
-					...dto,
-					categoryIds: ['cat-1'],
-					type: 'TRADE',
-				}),
-			).rejects.toBeInstanceOf(BadRequestException);
-		});
-
-		it('grava tradefor quando type=TRADE e tradefor informado', async () => {
-			prisma.category.findMany.mockResolvedValue([{ id: 'cat-1' }]);
-			prisma.ad.create.mockResolvedValue(adRow);
-
-			await service.create('owner-id', {
-				...dto,
-				categoryIds: ['cat-1'],
-				type: 'TRADE',
-				tradefor: ['cadeira', 'monitor'],
-			});
-
-			expect(prisma.ad.create).toHaveBeenCalledWith(
-				expect.objectContaining({
-					data: expect.objectContaining({
-						type: 'TRADE',
-						slug: 'iphone-12',
-						tradefor: ['cadeira', 'monitor'],
-					}),
-				}),
-			);
-		});
-
-		it('rejeita tradefor quando type != TRADE', async () => {
-			prisma.category.findMany.mockResolvedValue([{ id: 'cat-1' }]);
-
-			await expect(
-				service.create('owner-id', {
-					...dto,
-					categoryIds: ['cat-1'],
-					type: 'SALE',
-					tradefor: ['cadeira'],
-				}),
-			).rejects.toBeInstanceOf(BadRequestException);
 		});
 	});
 
@@ -871,77 +801,6 @@ describe('AdsService', () => {
 					slug: 'taken',
 				}),
 			).rejects.toBeInstanceOf(ConflictException);
-		});
-
-		it('exige tradefor ao mudar para TRADE', async () => {
-			prisma.ad.findUnique.mockResolvedValue(adRow);
-
-			await expect(
-				service.update('owner-id', 'USER', 'ad-1', {
-					type: 'TRADE',
-				}),
-			).rejects.toBeInstanceOf(BadRequestException);
-		});
-
-		it('limpa tradefor ao sair de TRADE', async () => {
-			prisma.ad.findUnique.mockResolvedValue({
-				...adRow,
-				type: 'TRADE',
-				tradefor: ['cadeira'],
-			});
-			prisma.ad.update.mockResolvedValue({
-				...adRow,
-				type: 'SALE',
-				tradefor: [],
-			});
-
-			await service.update('owner-id', 'USER', 'ad-1', {
-				type: 'SALE',
-			});
-
-			expect(prisma.ad.update).toHaveBeenCalledWith(
-				expect.objectContaining({
-					data: expect.objectContaining({
-						type: 'SALE',
-						tradefor: [],
-					}),
-				}),
-			);
-		});
-
-		it('grava tradefor ao editar um anúncio TRADE', async () => {
-			prisma.ad.findUnique.mockResolvedValue({
-				...adRow,
-				type: 'TRADE',
-				tradefor: ['cadeira'],
-			});
-			prisma.ad.update.mockResolvedValue({
-				...adRow,
-				type: 'TRADE',
-				tradefor: ['cadeira', 'monitor'],
-			});
-
-			await service.update('owner-id', 'USER', 'ad-1', {
-				tradefor: ['cadeira', 'monitor'],
-			});
-
-			expect(prisma.ad.update).toHaveBeenCalledWith(
-				expect.objectContaining({
-					data: expect.objectContaining({
-						tradefor: ['cadeira', 'monitor'],
-					}),
-				}),
-			);
-		});
-
-		it('rejeita tradefor quando type não é e não vira TRADE', async () => {
-			prisma.ad.findUnique.mockResolvedValue(adRow);
-
-			await expect(
-				service.update('owner-id', 'USER', 'ad-1', {
-					tradefor: ['cadeira'],
-				}),
-			).rejects.toBeInstanceOf(BadRequestException);
 		});
 	});
 

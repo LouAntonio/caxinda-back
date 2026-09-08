@@ -40,7 +40,6 @@ describe('ChatsService', () => {
 		slug: 'test-ad',
 		image: null,
 		price: new Prisma.Decimal('100.5'),
-		type: 'SALE',
 	};
 	const OTHER_USER = 'other-user-1';
 
@@ -150,48 +149,6 @@ describe('ChatsService', () => {
 				service.createConversation('user-2', { adId: AD.id }),
 			).rejects.toThrow(BadRequestException);
 		});
-
-		it('403 para TRADE/DONATION quando KYC não está aprovado', async () => {
-			prisma.ad.findUnique.mockResolvedValue({ ...AD, type: 'TRADE' });
-			prisma.user.findUnique.mockResolvedValue({
-				id: 'user-2',
-				kyc: { status: 'PENDING' },
-			});
-
-			await expect(
-				service.createConversation('user-2', { adId: AD.id }),
-			).rejects.toThrow(ForbiddenException);
-
-			prisma.ad.findUnique.mockResolvedValue({ ...AD, type: 'DONATION' });
-			prisma.user.findUnique.mockResolvedValue(null);
-
-			await expect(
-				service.createConversation('user-2', { adId: AD.id }),
-			).rejects.toThrow(ForbiddenException);
-		});
-
-		it('deixa avançar TRADE/DONATION quando KYC está aprovado', async () => {
-			prisma.ad.findUnique.mockResolvedValue({ ...AD, type: 'TRADE' });
-			prisma.user.findUnique.mockResolvedValue({
-				id: 'user-2',
-				kyc: { status: 'APPROVED' },
-			});
-			prisma.conversation.findFirst.mockResolvedValue(null);
-			prisma.conversation.create.mockResolvedValue({
-				id: 'conv-trade',
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				participants: [],
-			});
-
-			const result = await service.createConversation('user-2', {
-				adId: AD.id,
-			});
-			expect(result.id).toBe('conv-trade');
-			expect(prisma.user.findUnique).toHaveBeenCalledWith(
-				expect.objectContaining({ where: { id: 'user-2' } }),
-			);
-		});
 	});
 
 	describe('listConversations', () => {
@@ -207,7 +164,6 @@ describe('ChatsService', () => {
 					slug: AD.slug,
 					image: AD.image,
 					price: AD.price,
-					type: AD.type,
 				},
 				participants: [
 					{

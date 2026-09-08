@@ -12,9 +12,15 @@ import {
 import { Type } from 'class-transformer';
 
 export class CreateReviewDto {
-	@ApiProperty({ example: '00000000-0000-7000-8000-000000000001' })
+	@ApiPropertyOptional({ example: '00000000-0000-7000-8000-000000000001' })
+	@IsOptional()
 	@IsUUID('7', { message: 'adId deve ser um UUID' })
-	adId: string;
+	adId?: string;
+
+	@ApiPropertyOptional({ example: '00000000-0000-7000-8000-000000000002' })
+	@IsOptional()
+	@IsUUID('7', { message: 'businessId deve ser um UUID' })
+	businessId?: string;
 
 	@ApiProperty({ example: 5, minimum: 1, maximum: 5 })
 	@IsInt()
@@ -44,6 +50,11 @@ export class ReviewsQueryDto {
 	@IsOptional()
 	@IsUUID('7', { message: 'adId deve ser um UUID' })
 	adId?: string;
+
+	@ApiPropertyOptional({ description: 'Filtrar por empresa' })
+	@IsOptional()
+	@IsUUID('7', { message: 'businessId deve ser um UUID' })
+	businessId?: string;
 
 	@ApiPropertyOptional({ description: 'Filtrar por usuário avaliado' })
 	@IsOptional()

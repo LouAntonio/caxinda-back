@@ -61,9 +61,6 @@ const targetUser = {
 	phone: null,
 	trustScore: 0,
 	isVerified: false,
-	subscriptionTier: 'free',
-	neighborhood: null,
-	city: null,
 	createdAt: new Date('2026-01-01T00:00:00Z'),
 	updatedAt: new Date('2026-01-01T00:00:00Z'),
 };
@@ -182,7 +179,6 @@ describe('UsersService', () => {
 
 			const result = await service.updateMe('target-id', {
 				phone: '+55 11 99999-9999',
-				city: 'São Paulo',
 			});
 
 			expect(prisma.user.update).toHaveBeenCalledWith(
@@ -190,41 +186,10 @@ describe('UsersService', () => {
 					where: { id: 'target-id' },
 					data: expect.objectContaining({
 						phone: '+55 11 99999-9999',
-						city: 'São Paulo',
 					}),
 				}),
 			);
 			expect(result.phone).toBe('+55 11 99999-9999');
-		});
-
-		it('atualiza os dados bancários e devolve-os no perfil seguro', async () => {
-			prisma.user.findUnique.mockResolvedValue(targetUser);
-			prisma.user.findFirst.mockResolvedValue(null);
-			prisma.user.update.mockResolvedValue({
-				...targetUser,
-				bankName: 'Banco BAI',
-				bankHolder: 'João Silva',
-				bankIban: 'AO0600000000000000000000',
-			});
-
-			const result = await service.updateMe('target-id', {
-				bankName: 'Banco BAI',
-				bankHolder: 'João Silva',
-				bankIban: 'AO0600000000000000000000',
-			});
-
-			expect(prisma.user.update).toHaveBeenCalledWith(
-				expect.objectContaining({
-					data: expect.objectContaining({
-						bankName: 'Banco BAI',
-						bankHolder: 'João Silva',
-						bankIban: 'AO0600000000000000000000',
-					}),
-				}),
-			);
-			expect(result.bankName).toBe('Banco BAI');
-			expect(result.bankHolder).toBe('João Silva');
-			expect(result.bankIban).toBe('AO0600000000000000000000');
 		});
 
 		it('lança ConflictException quando o telefone já está em uso', async () => {
@@ -398,7 +363,7 @@ describe('UsersService', () => {
 			);
 			expect(prisma.user.update).toHaveBeenCalledWith({
 				where: { id: 'target-id' },
-				data: { isVerified: false },
+				data: { isVerified: false, role: 'USER' },
 			});
 			expect(emailService.enqueue).toHaveBeenCalledWith(
 				expect.objectContaining({ subject: 'Sua conta foi banida' }),
