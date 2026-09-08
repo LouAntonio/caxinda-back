@@ -17,6 +17,7 @@ import { winstonOptions } from './common/logging/winston.config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { ResendModule } from './common/resend/resend.module';
 import { KycModule } from './kyc/kyc.module';
+import { PaymentsModule } from './payments/payments.module';
 import { ReportsModule } from './reports/reports.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UsersModule } from './users/users.module';
@@ -60,6 +61,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
 		CategoriesModule,
 		ChatsModule,
 		KycModule,
+		PaymentsModule,
 		ReportsModule,
 		ReviewsModule,
 		UsersModule,

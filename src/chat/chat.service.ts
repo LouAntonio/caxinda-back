@@ -38,13 +38,85 @@ const AD_SELECT = {
 	price: true,
 } as const;
 
+const BUSINESS_SELECT = {
+	id: true,
+	name: true,
+	slug: true,
+	logoUrl: true,
+} as const;
+
+const CONVERSATION_INCLUDE = {
+	ad: { select: AD_SELECT },
+	business: { select: BUSINESS_SELECT },
+	participants: {
+		include: { user: { select: USER_SELECT } },
+	},
+	messages: {
+		take: 1,
+		orderBy: { createdAt: 'desc' },
+		select: MESSAGE_SELECT,
+	},
+} as const;
+
+type ConversationWithInclude = Prisma.ConversationGetPayload<{
+	include: typeof CONVERSATION_INCLUDE;
+}>;
+
+const SUPPORT_AGENT: {
+	id: string;
+	name: string;
+	surname: string;
+	image: string | null;
+} = {
+	id: '__support__',
+	name: 'Suporte Caxinda',
+	surname: '',
+	image: null,
+};
+
 @Injectable()
 export class ChatsService {
 	constructor(private readonly prisma: PrismaService) {}
 
 	async createConversation(userId: string, dto: CreateConversationDto) {
+		const hasAd = Boolean(dto.adId);
+		const hasBusiness = Boolean(dto.businessId);
+		const isSupport = dto.type === 'SUPPORT';
+
+		if (isSupport) {
+			if (hasAd || hasBusiness) {
+				throw new BadRequestException(
+					'Uma conversa de suporte não pode ter adId nem businessId.',
+				);
+			}
+			return this.createSupportConversation(userId);
+		}
+
+		if (hasAd === hasBusiness) {
+			throw new BadRequestException(
+				'Informe adId ou businessId (apenas um deles).',
+			);
+		}
+
+		if (dto.type === 'AD' && hasBusiness) {
+			throw new BadRequestException(
+				'Uma conversa de anúncio não pode ter businessId.',
+			);
+		}
+		if (dto.type === 'BUSINESS' && hasAd) {
+			throw new BadRequestException(
+				'Uma conversa de empresa não pode ter adId.',
+			);
+		}
+
+		return hasAd
+			? this.createAdConversation(userId, dto.adId as string)
+			: this.createBusinessConversation(userId, dto.businessId as string);
+	}
+
+	private async createAdConversation(userId: string, adId: string) {
 		const ad = await this.prisma.ad.findUnique({
-			where: { id: dto.adId },
+			where: { id: adId },
 			select: {
 				id: true,
 				userId: true,
@@ -69,6 +141,7 @@ export class ChatsService {
 
 		const existing = await this.prisma.conversation.findFirst({
 			where: {
+				type: 'AD',
 				adId: ad.id,
 				participants: { some: { userId } },
 			},
@@ -82,6 +155,7 @@ export class ChatsService {
 		return this.prisma.conversation.create({
 			data: {
 				id: newId(),
+				type: 'AD',
 				adId: ad.id,
 				participants: {
 					create: [
@@ -94,12 +168,102 @@ export class ChatsService {
 		});
 	}
 
+	private async createBusinessConversation(
+		userId: string,
+		businessId: string,
+	) {
+		const business = await this.prisma.business.findUnique({
+			where: { id: businessId },
+			select: {
+				id: true,
+				ownerId: true,
+				status: true,
+			},
+		});
+
+		if (!business) {
+			throw new NotFoundException('Empresa não encontrada.');
+		}
+		if (business.ownerId === userId) {
+			throw new BadRequestException(
+				'Não é possível abrir uma conversa com a sua própria empresa.',
+			);
+		}
+		if (business.status !== 'SHOW') {
+			throw new BadRequestException(
+				'Esta empresa não está disponível para conversa.',
+			);
+		}
+
+		const existing = await this.prisma.conversation.findFirst({
+			where: {
+				type: 'BUSINESS',
+				businessId: business.id,
+				participants: { some: { userId } },
+			},
+			select: { id: true },
+		});
+
+		if (existing) {
+			return existing;
+		}
+
+		return this.prisma.conversation.create({
+			data: {
+				id: newId(),
+				type: 'BUSINESS',
+				businessId: business.id,
+				participants: {
+					create: [
+						{ id: newId(), userId },
+						{ id: newId(), userId: business.ownerId },
+					],
+				},
+			},
+			select: { id: true },
+		});
+	}
+
+	private async createSupportConversation(userId: string) {
+		const existing = await this.prisma.conversation.findFirst({
+			where: {
+				type: 'SUPPORT',
+				participants: { some: { userId } },
+			},
+			select: { id: true },
+		});
+
+		if (existing) {
+			return existing;
+		}
+
+		return this.prisma.conversation.create({
+			data: {
+				id: newId(),
+				type: 'SUPPORT',
+				participants: {
+					create: [{ id: newId(), userId }],
+				},
+			},
+			select: { id: true },
+		});
+	}
+
 	async listConversations(userId: string, query: ConversationsQueryDto) {
 		const page = query.page ?? 1;
 		const limit = query.limit ?? 20;
-		const where: Prisma.ConversationWhereInput = {
-			participants: { some: { userId } },
-		};
+
+		const isStaff = await this.isStaff(userId);
+		const where: Prisma.ConversationWhereInput = isStaff
+			? {
+					OR: [
+						{ participants: { some: { userId } } },
+						{ type: 'SUPPORT' },
+					],
+				}
+			: {
+					participants: { some: { userId } },
+				};
 
 		const [total, conversations] = await Promise.all([
 			this.prisma.conversation.count({ where }),
@@ -108,17 +272,7 @@ export class ChatsService {
 				orderBy: { updatedAt: 'desc' },
 				skip: (page - 1) * limit,
 				take: limit,
-				include: {
-					ad: { select: AD_SELECT },
-					participants: {
-						include: { user: { select: USER_SELECT } },
-					},
-					messages: {
-						take: 1,
-						orderBy: { createdAt: 'desc' },
-						select: MESSAGE_SELECT,
-					},
-				},
+				include: CONVERSATION_INCLUDE,
 			}),
 		]);
 
@@ -163,17 +317,7 @@ export class ChatsService {
 				orderBy: { updatedAt: 'desc' },
 				skip: (page - 1) * limit,
 				take: limit,
-				include: {
-					ad: { select: AD_SELECT },
-					participants: {
-						include: { user: { select: USER_SELECT } },
-					},
-					messages: {
-						take: 1,
-						orderBy: { createdAt: 'desc' },
-						select: MESSAGE_SELECT,
-					},
-				},
+				include: CONVERSATION_INCLUDE,
 			}),
 		]);
 
@@ -210,25 +354,13 @@ export class ChatsService {
 	async getConversation(userId: string, id: string) {
 		const conversation = await this.prisma.conversation.findUnique({
 			where: { id },
-			include: {
-				ad: { select: AD_SELECT },
-				participants: { include: { user: { select: USER_SELECT } } },
-				messages: {
-					take: 1,
-					orderBy: { createdAt: 'desc' },
-					select: MESSAGE_SELECT,
-				},
-			},
+			include: CONVERSATION_INCLUDE,
 		});
 
 		if (!conversation) {
 			throw new NotFoundException('Conversa não encontrada.');
 		}
-		if (!conversation.participants.some((p) => p.userId === userId)) {
-			throw new ForbiddenException(
-				'Você não é participante desta conversa.',
-			);
-		}
+		await this.assertParticipant(userId, id);
 
 		const unreadByConversation = new Map<string, number>();
 		unreadByConversation.set(id, await this.unreadCount(id, userId));
@@ -284,17 +416,14 @@ export class ChatsService {
 			);
 		}
 
+		await this.assertParticipant(userId, conversationId);
+
 		const conversation = await this.prisma.conversation.findUnique({
 			where: { id: conversationId },
-			select: { id: true, participants: { select: { userId: true } } },
+			select: { participants: { select: { userId: true } } },
 		});
 		if (!conversation) {
 			throw new NotFoundException('Conversa não encontrada.');
-		}
-		if (!conversation.participants.some((p) => p.userId === userId)) {
-			throw new ForbiddenException(
-				'Você não é participante desta conversa.',
-			);
 		}
 
 		const [message] = await this.prisma.$transaction([
@@ -343,18 +472,23 @@ export class ChatsService {
 	async assertParticipant(userId: string, conversationId: string) {
 		const conversation = await this.prisma.conversation.findUnique({
 			where: { id: conversationId },
-			select: { participants: { select: { userId: true } } },
+			select: {
+				id: true,
+				type: true,
+				participants: { select: { userId: true } },
+			},
 		});
 
 		if (!conversation) {
 			throw new NotFoundException('Conversa não encontrada.');
 		}
-		if (!conversation.participants.some((p) => p.userId === userId)) {
-			throw new ForbiddenException(
-				'Você não é participante desta conversa.',
-			);
+		if (conversation.participants.some((p) => p.userId === userId)) {
+			return true;
 		}
-		return true;
+		if (conversation.type === 'SUPPORT' && (await this.isStaff(userId))) {
+			return true;
+		}
+		throw new ForbiddenException('Você não é participante desta conversa.');
 	}
 
 	async getParticipantIds(
@@ -387,55 +521,46 @@ export class ChatsService {
 		});
 	}
 
+	private async isStaff(userId: string): Promise<boolean> {
+		const user = await this.prisma.user.findUnique({
+			where: { id: userId },
+			select: { role: true },
+		});
+		return user?.role === 'ADMIN' || user?.role === 'MODERATOR';
+	}
+
 	private toConversationView(
-		conversation: {
-			id: string;
-			updatedAt: Date;
-			createdAt: Date;
-			ad: {
-				id: string;
-				title: string;
-				slug: string;
-				image: string | null;
-				price: Prisma.Decimal | null;
-			};
-			participants: {
-				user: {
-					id: string;
-					name: string;
-					surname: string | null;
-					image: string | null;
-				};
-				userId: string;
-			}[];
-			messages: {
-				id: string;
-				content: string;
-				createdAt: Date;
-				senderId: string;
-				isRead: boolean;
-				media: unknown;
-			}[];
-		},
+		conversation: ConversationWithInclude,
 		viewerId: string,
 		unreadByConversation: Map<string, number>,
 	) {
-		const other = conversation.participants.find(
-			(p) => p.userId !== viewerId,
+		const participantUser = conversation.participants.find(
+			(p) => p.userId === viewerId,
 		)?.user;
+		let other =
+			conversation.participants.find((p) => p.userId !== viewerId)
+				?.user ?? null;
+
+		if (conversation.type === 'SUPPORT' && participantUser) {
+			other = SUPPORT_AGENT;
+		}
 
 		const lastMessage = conversation.messages[0];
 		return {
 			id: conversation.id,
+			type: conversation.type,
 			createdAt: conversation.createdAt,
 			updatedAt: conversation.updatedAt,
-			ad: {
-				...conversation.ad,
-				price:
-					conversation.ad.price === null
-						? null
-						: conversation.ad.price.toNumber(),
-			},
+			ad: conversation.ad
+				? {
+						...conversation.ad,
+						price:
+							conversation.ad.price === null
+								? null
+								: conversation.ad.price.toNumber(),
+					}
+				: null,
+			business: conversation.business ?? null,
 			other: other ?? null,
 			lastMessage: lastMessage
 				? {

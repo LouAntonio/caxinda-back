@@ -4,6 +4,7 @@ import {
 	IsArray,
 	IsBoolean,
 	IsDate,
+	IsEnum,
 	IsInt,
 	IsNotEmpty,
 	IsOptional,
@@ -16,14 +17,33 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ConversationType } from '../generated/prisma/client';
 
 export class CreateConversationDto {
-	@ApiProperty({
+	@ApiPropertyOptional({
 		example: '00000000-0000-7000-8000-000000000001',
 		description: 'Id do anúncio sobre o qual a conversa será aberta',
 	})
+	@IsOptional()
 	@IsUUID('7', { message: 'adId deve ser um UUID' })
-	adId: string;
+	adId?: string;
+
+	@ApiPropertyOptional({
+		example: '00000000-0000-7000-8000-000000000002',
+		description: 'Id da empresa sobre a qual a conversa será aberta',
+	})
+	@IsOptional()
+	@IsUUID('7', { message: 'businessId deve ser um UUID' })
+	businessId?: string;
+
+	@ApiPropertyOptional({
+		enum: ConversationType,
+		description:
+			'SUPPORT abre conversa com o suporte; AD (padrão) usa adId e BUSINESS usa businessId',
+	})
+	@IsOptional()
+	@IsEnum(ConversationType, { message: 'type inválido' })
+	type?: ConversationType;
 }
 
 export class ChatMediaDto {

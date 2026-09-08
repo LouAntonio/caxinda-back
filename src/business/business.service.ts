@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { PaymentsService } from '../payments/payments.service';
 import { newId } from '../libs/id';
 import { slugify } from '../categories/categories.service';
 import {
@@ -57,9 +58,13 @@ function isUniqueViolation(
 
 @Injectable()
 export class BusinessesService {
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly paymentsService: PaymentsService,
+	) {}
 
 	async listPublic(query: BusinessesQueryDto, viewer?: BusinessSessionUser) {
+		await this.paymentsService.expireStaleSubscriptions();
 		const page = query.page ?? 1;
 		const limit = query.limit ?? 20;
 		const privileged = this.isPrivileged(viewer);
@@ -97,6 +102,7 @@ export class BusinessesService {
 	}
 
 	async getBySlug(slug: string, viewer?: BusinessSessionUser) {
+		await this.paymentsService.expireStaleSubscriptions();
 		const business = await this.prisma.business.findUnique({
 			where: { slug },
 			include: BUSINESS_INCLUDE,
@@ -109,6 +115,7 @@ export class BusinessesService {
 	}
 
 	async getById(id: string, viewer?: BusinessSessionUser) {
+		await this.paymentsService.expireStaleSubscriptions();
 		const business = await this.prisma.business.findUnique({
 			where: { id },
 			include: BUSINESS_INCLUDE,

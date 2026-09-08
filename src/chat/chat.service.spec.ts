@@ -12,6 +12,7 @@ describe('ChatsService', () => {
 	let service: ChatsService;
 	let prisma: {
 		ad: { findUnique: jest.Mock };
+		business: { findUnique: jest.Mock };
 		user: { findUnique: jest.Mock };
 		conversation: {
 			findFirst: jest.Mock;
@@ -46,6 +47,7 @@ describe('ChatsService', () => {
 	beforeEach(async () => {
 		prisma = {
 			ad: { findUnique: jest.fn() },
+			business: { findUnique: jest.fn() },
 			user: { findUnique: jest.fn() },
 			conversation: {
 				findFirst: jest.fn(),
@@ -109,6 +111,11 @@ describe('ChatsService', () => {
 				}),
 			);
 			expect(prisma.conversation.create).toHaveBeenCalledTimes(1);
+			expect(prisma.conversation.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({ type: 'AD', adId: 'ad-1' }),
+				}),
+			);
 		});
 
 		it('reutiliza conversa existente para o mesmo AD e user', async () => {
@@ -149,6 +156,144 @@ describe('ChatsService', () => {
 				service.createConversation('user-2', { adId: AD.id }),
 			).rejects.toThrow(BadRequestException);
 		});
+
+		it('400 quando adId e businessId são fornecidos juntos', async () => {
+			await expect(
+				service.createConversation('user-2', {
+					adId: 'ad-1',
+					businessId: 'biz-1',
+				}),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('400 quando nenhum alvo é informado', async () => {
+			await expect(
+				service.createConversation('user-2', {}),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('400 quando type AD vem com businessId', async () => {
+			await expect(
+				service.createConversation('user-2', {
+					type: 'AD' as const,
+					businessId: 'biz-1',
+				}),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('cria conversa de empresa com o dono', async () => {
+			prisma.business.findUnique.mockResolvedValue({
+				id: 'biz-1',
+				ownerId: 'owner-biz',
+				status: 'SHOW',
+			});
+			prisma.conversation.findFirst.mockResolvedValue(null);
+			prisma.conversation.create.mockResolvedValue({
+				id: 'conv-biz',
+			});
+
+			const result = await service.createConversation('user-2', {
+				businessId: 'biz-1',
+			});
+
+			expect(result.id).toBe('conv-biz');
+			expect(prisma.conversation.findFirst).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.objectContaining({
+						type: 'BUSINESS',
+						businessId: 'biz-1',
+					}),
+				}),
+			);
+			expect(prisma.conversation.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						type: 'BUSINESS',
+						businessId: 'biz-1',
+					}),
+				}),
+			);
+		});
+
+		it('400 para a sua própria empresa', async () => {
+			prisma.business.findUnique.mockResolvedValue({
+				id: 'biz-1',
+				ownerId: 'user-2',
+				status: 'SHOW',
+			});
+
+			await expect(
+				service.createConversation('user-2', {
+					businessId: 'biz-1',
+				}),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('400 quando empresa não está SHOW', async () => {
+			prisma.business.findUnique.mockResolvedValue({
+				id: 'biz-1',
+				ownerId: 'owner-biz',
+				status: 'HIDE',
+			});
+
+			await expect(
+				service.createConversation('user-2', {
+					businessId: 'biz-1',
+				}),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('404 para empresa inexistente', async () => {
+			prisma.business.findUnique.mockResolvedValue(null);
+
+			await expect(
+				service.createConversation('user-2', {
+					businessId: 'biz-1',
+				}),
+			).rejects.toThrow(NotFoundException);
+		});
+
+		it('cria conversa de suporte (SUPPORT) com um participante', async () => {
+			prisma.conversation.findFirst.mockResolvedValue(null);
+			prisma.conversation.create.mockResolvedValue({
+				id: 'conv-supp',
+			});
+
+			const result = await service.createConversation('user-2', {
+				type: 'SUPPORT' as const,
+			});
+
+			expect(result.id).toBe('conv-supp');
+			expect(prisma.conversation.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						type: 'SUPPORT',
+					}),
+				}),
+			);
+		});
+
+		it('reutiliza conversa de suporte existente', async () => {
+			prisma.conversation.findFirst.mockResolvedValue({
+				id: 'conv-supp-existing',
+			});
+
+			const result = await service.createConversation('user-2', {
+				type: 'SUPPORT' as const,
+			});
+
+			expect(result.id).toBe('conv-supp-existing');
+			expect(prisma.conversation.create).not.toHaveBeenCalled();
+		});
+
+		it('400 quando SUPPORT tem adId', async () => {
+			await expect(
+				service.createConversation('user-2', {
+					type: 'SUPPORT' as const,
+					adId: 'ad-1',
+				}),
+			).rejects.toThrow(BadRequestException);
+		});
 	});
 
 	describe('listConversations', () => {
@@ -156,6 +301,7 @@ describe('ChatsService', () => {
 			const now = new Date('2026-09-01T12:00:00Z');
 			const conv = {
 				id: 'conv-1',
+				type: 'AD',
 				createdAt: now,
 				updatedAt: now,
 				ad: {
@@ -165,6 +311,7 @@ describe('ChatsService', () => {
 					image: AD.image,
 					price: AD.price,
 				},
+				business: null,
 				participants: [
 					{
 						userId: OTHER_USER,
@@ -215,7 +362,36 @@ describe('ChatsService', () => {
 			expect(result.items).toHaveLength(1);
 			expect(result.items[0].unreadCount).toBe(2);
 			expect(result.items[0].other!.id).toBe(OTHER_USER);
-			expect(result.items[0].ad.price).toBe(100.5);
+			expect(result.items[0].ad!.price).toBe(100.5);
+			expect(result.items[0].type).toBe('AD');
+			expect(result.items[0].business).toBeNull();
+		});
+
+		it('staff vê todas as conversas SUPPORT na própria lista', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.count.mockResolvedValue(0);
+			prisma.conversation.findMany.mockResolvedValue([]);
+			prisma.message.groupBy.mockResolvedValue([]);
+
+			await service.listConversations('moderator-1', {
+				page: 1,
+				limit: 20,
+			});
+
+			expect(prisma.conversation.findMany).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.objectContaining({
+						OR: [
+							{
+								participants: {
+									some: { userId: 'moderator-1' },
+								},
+							},
+							{ type: 'SUPPORT' },
+						],
+					}),
+				}),
+			);
 		});
 	});
 
@@ -236,6 +412,39 @@ describe('ChatsService', () => {
 
 			await expect(
 				service.getMessages('unauthorized-user', 'conv-1', {}),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('staff acede a conversas SUPPORT por role', async () => {
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				participants: [{ userId: 'end-user' }],
+			});
+			prisma.user.findUnique.mockResolvedValue({
+				role: 'MODERATOR',
+			});
+			prisma.message.findMany.mockResolvedValue([]);
+
+			const result = await service.getMessages(
+				'moderator-1',
+				'conv-supp',
+				{},
+			);
+
+			expect(result.items).toEqual([]);
+		});
+
+		it('utilizador normal não acede a conversa SUPPORT sem ser participante', async () => {
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				participants: [{ userId: 'end-user' }],
+			});
+			prisma.user.findUnique.mockResolvedValue({ role: 'USER' });
+
+			await expect(
+				service.getMessages('normal-user', 'conv-supp', {}),
 			).rejects.toThrow(ForbiddenException);
 		});
 

@@ -11,14 +11,7 @@ const statements = {
 	report: ['create', 'list', 'moderate'] as const,
 	plan: ['manage'] as const,
 	subscription: ['manage'] as const,
-	payment: [
-		'buy',
-		'submit',
-		'cancel',
-		'review',
-		'release',
-		'manage',
-	] as const,
+	payment: ['buy', 'submit', 'cancel', 'review', 'manage'] as const,
 };
 
 export const ac = createAccessControl(statements);
@@ -50,7 +43,7 @@ export const moderatorRole = ac.newRole({
 	report: ['create', 'list', 'moderate'],
 	plan: ['manage'],
 	subscription: ['manage'],
-	payment: ['buy', 'submit', 'cancel', 'review', 'release'],
+	payment: ['buy', 'submit', 'cancel', 'review'],
 });
 
 export const adminRole = ac.newRole({
@@ -64,7 +57,7 @@ export const adminRole = ac.newRole({
 	report: ['create', 'list', 'moderate'],
 	plan: ['manage'],
 	subscription: ['manage'],
-	payment: ['buy', 'submit', 'cancel', 'review', 'release', 'manage'],
+	payment: ['buy', 'submit', 'cancel', 'review', 'manage'],
 });
 
 export const roles: Record<string, Role> = {

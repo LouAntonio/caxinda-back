@@ -33,7 +33,6 @@ describe('AdsService', () => {
 			updateMany: jest.Mock;
 			delete: jest.Mock;
 		};
-		subscription: { findFirst: jest.Mock; count: jest.Mock };
 		category: { findMany: jest.Mock };
 		user: { findUnique: jest.Mock };
 		$queryRaw: jest.Mock;
@@ -116,7 +115,6 @@ describe('AdsService', () => {
 				updateMany: jest.fn().mockResolvedValue({ count: 0 }),
 				delete: jest.fn(),
 			},
-			subscription: { findFirst: jest.fn(), count: jest.fn() },
 			category: { findMany: jest.fn() },
 			user: { findUnique: jest.fn() },
 			$queryRaw: jest.fn().mockResolvedValue([]),
@@ -392,33 +390,8 @@ describe('AdsService', () => {
 			);
 		});
 
-		it('lança Forbidden quando o plano não inclui destaques', async () => {
+		it('destaca anúncio até now + 30 dias', async () => {
 			prisma.ad.findUnique.mockResolvedValue(adRow);
-			prisma.subscription.findFirst.mockResolvedValue(null);
-
-			await expect(service.feature('owner-id', 'ad-1')).rejects.toThrow(
-				ForbiddenException,
-			);
-		});
-
-		it('lança Conflict quando o limite simultâneo é atingido', async () => {
-			prisma.ad.findUnique.mockResolvedValue(adRow);
-			prisma.subscription.findFirst.mockResolvedValue({
-				plan: { featuredAdsLimit: 2, durationDays: 30 },
-			});
-			prisma.ad.count.mockResolvedValue(2);
-
-			await expect(service.feature('owner-id', 'ad-1')).rejects.toThrow(
-				ConflictException,
-			);
-		});
-
-		it('destaca anúncio até now + durationDays', async () => {
-			prisma.ad.findUnique.mockResolvedValue(adRow);
-			prisma.subscription.findFirst.mockResolvedValue({
-				plan: { featuredAdsLimit: 2, durationDays: 30 },
-			});
-			prisma.ad.count.mockResolvedValue(0);
 			prisma.ad.update.mockResolvedValue({ ...adRow, featured: true });
 
 			await service.feature('owner-id', 'ad-1');
@@ -428,6 +401,7 @@ describe('AdsService', () => {
 			expect(updateArg.where.id).toBe('ad-1');
 			expect(updateArg.data.featured).toBe(true);
 			expect(updateArg.data.featuredUntil).toBeInstanceOf(Date);
+			expect(updateArg.data.featuredAt).toBeInstanceOf(Date);
 		});
 	});
 

@@ -52,6 +52,8 @@ interface CacheableAd {
 
 type AdDetail = Prisma.AdGetPayload<{ include: typeof AD_INCLUDE }>;
 
+const FEATURED_DURATION_DAYS = 30;
+
 const AD_INCLUDE = {
 	categories: true,
 	user: {
@@ -458,30 +460,9 @@ export class AdsService {
 
 		await this.expireStaleFeatured();
 
-		const plan = await this.activePlan(userId);
-		if (!plan || plan.featuredAdsLimit <= 0) {
-			throw new ForbiddenException(
-				'O seu plano não inclui anúncios em destaque.',
-			);
-		}
-
 		const now = new Date();
-		const activeFeatures = await this.prisma.ad.count({
-			where: {
-				userId,
-				featured: true,
-				featuredUntil: { gt: now },
-				id: { not: adId },
-			},
-		});
-		if (activeFeatures >= plan.featuredAdsLimit) {
-			throw new ConflictException(
-				'Você atingiu o limite de anúncios em destaque do seu plano.',
-			);
-		}
-
 		const featuredUntil = new Date(
-			now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000,
+			now.getTime() + FEATURED_DURATION_DAYS * 24 * 60 * 60 * 1000,
 		);
 
 		const updated = await this.prisma.ad.update({
@@ -521,15 +502,6 @@ export class AdsService {
 		await this.invalidateAdCache(adId);
 
 		return updated;
-	}
-
-	private async activePlan(userId: string) {
-		const subscription = await this.prisma.subscription.findFirst({
-			where: { userId, status: 'ACTIVE' },
-			orderBy: { endDate: 'desc' },
-			include: { plan: true },
-		});
-		return subscription?.plan ?? null;
 	}
 
 	private async expireStaleFeatured() {

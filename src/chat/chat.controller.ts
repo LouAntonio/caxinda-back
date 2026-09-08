@@ -43,7 +43,8 @@ export class ChatsController {
 
 	@Post()
 	@ApiOperation({
-		summary: 'Abrir (ou reusar) uma conversa sobre um anúncio',
+		summary:
+			'Abrir (ou reusar) uma conversa: adId para anúncio, businessId para empresa ou type SUPPORT',
 	})
 	async createConversation(
 		@Req() req: Request,

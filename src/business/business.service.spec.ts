@@ -6,6 +6,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { PaymentsService } from '../payments/payments.service';
 import { BusinessesService } from './business.service';
 
 function businessRow(overrides: Record<string, unknown> = {}) {
@@ -77,6 +78,10 @@ describe('BusinessesService', () => {
 			providers: [
 				BusinessesService,
 				{ provide: PrismaService, useValue: prisma },
+				{
+					provide: PaymentsService,
+					useValue: { expireStaleSubscriptions: jest.fn() },
+				},
 			],
 		}).compile();
 
