@@ -1,0 +1,110 @@
+generator client {
+	provider     = "prisma-client"
+	output       = "../src/generated/prisma"
+	moduleFormat = "cjs"
+}
+
+datasource db {
+	provider = "postgresql"
+}
+
+enum Role {
+	USER
+	ADMIN
+	MODERATOR
+	ENTERPRISE // listar empresas
+}
+
+enum KYCStatus {
+	PENDING
+	APPROVED
+	REJECTED
+}
+
+model User {
+	id            String    @id @db.Uuid
+	name          String
+	email         String
+	emailVerified Boolean   @default(false)
+	image         String?
+	createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+	updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+	sessions      Session[]
+	accounts      Account[]
+	kyc           KYC?
+
+	@@unique([email])
+	@@map("user")
+}
+
+model KYC {
+	id     String @id @db.Uuid
+	userId String @unique @db.Uuid
+	user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+	status          KYCStatus @default(PENDING)
+	rejectionReason String? // Motivo caso seja rejeitado (ex: foto tremida)
+
+	// BI Frente
+	biFrontUrl String @db.VarChar(2048)
+	biFrontId  String @db.VarChar(255) // Cloudinary Public ID
+
+	// BI Verso
+	biBackUrl String @db.VarChar(2048)
+	biBackId  String @db.VarChar(255) // Cloudinary Public ID
+
+	// Selfies
+	selfies Json? @default("[]") @db.JsonB // Array de URLs e IDs do Cloudinary [{url, cloudinaryId}]
+
+	verifiedAt DateTime?
+	createdAt  DateTime  @default(now())
+	updatedAt  DateTime  @updatedAt
+
+	@@map("kyc")
+}
+
+model Session {
+	id        String   @id @db.Uuid
+	token     String
+	expiresAt DateTime @db.Timestamptz(3)
+	createdAt DateTime @default(now()) @db.Timestamptz(3)
+	updatedAt DateTime @updatedAt @db.Timestamptz(3)
+	ipAddress String?
+	userAgent String?
+	userId    String
+	user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+	@@unique([token])
+	@@map("session")
+}
+
+model Account {
+	id                    String    @id @db.Uuid
+	accountId             String
+	providerId            String
+	userId                String
+	user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+	accessToken           String?
+	refreshToken          String?
+	idToken               String?
+	accessTokenExpiresAt  DateTime? @db.Timestamptz(3)
+	refreshTokenExpiresAt DateTime? @db.Timestamptz(3)
+	scope                 String?
+	password              String?
+	createdAt             DateTime  @default(now()) @db.Timestamptz(3)
+	updatedAt             DateTime  @updatedAt @db.Timestamptz(3)
+
+	@@unique([providerId, accountId])
+	@@map("account")
+}
+
+model Verification {
+	id         String   @id @db.Uuid
+	identifier String
+	value      String
+	expiresAt  DateTime @db.Timestamptz(3)
+	createdAt  DateTime @default(now()) @db.Timestamptz(3)
+	updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+	@@map("verification")
+}
