@@ -331,6 +331,19 @@ export class PaymentsService {
 		);
 	}
 
+	async mine(userId: string): Promise<unknown> {
+		await this.expireStaleSubscriptions();
+		const payments = await this.prisma.payment.findMany({
+			where: {
+				subscription: { business: { ownerId: userId } },
+			},
+			orderBy: { createdAt: 'desc' },
+			take: 50,
+			include: PAYMENT_INCLUDE,
+		});
+		return payments.map((payment) => this.toPublicPayment(payment));
+	}
+
 	async getById(
 		userId: string,
 		role: string,

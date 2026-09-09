@@ -20,3 +20,13 @@ export class SetPasswordDto {
 	@MaxLength(72)
 	newPassword: string;
 }
+
+export class GoogleSignInDto {
+	@ApiProperty({
+		description:
+			'ID token (credential) devolvido pelo Google Identity Services',
+		example: 'eyJhbGciOiJSUzI1NiIsImtpZCI6Ij...',
+	})
+	@IsString()
+	credential: string;
+}

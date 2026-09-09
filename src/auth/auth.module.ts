@@ -6,6 +6,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { AuthController } from './auth.controller';
 import { MagicLinkService } from './magic-link.service';
+import { GoogleAuthService } from './services/google-auth.service';
 
 @Global()
 @Module({
@@ -18,7 +19,13 @@ import { MagicLinkService } from './magic-link.service';
 		}),
 	],
 	controllers: [AuthController],
-	providers: [AuthService, JwtAuthGuard, PermissionsGuard, MagicLinkService],
+	providers: [
+		AuthService,
+		JwtAuthGuard,
+		PermissionsGuard,
+		MagicLinkService,
+		GoogleAuthService,
+	],
 	exports: [
 		AuthService,
 		JwtAuthGuard,

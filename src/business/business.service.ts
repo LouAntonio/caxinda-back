@@ -76,12 +76,18 @@ export class BusinessesService {
 		const privileged = this.isPrivileged(viewer);
 
 		const where: Prisma.BusinessWhereInput = {
-			...(privileged ? {} : { status: 'SHOW' }),
+			...(query.ownerId && { ownerId: query.ownerId }),
 			...(query.province && { province: query.province }),
 			...(query.categoryId && { categoryId: query.categoryId }),
 			...(query.q && {
 				OR: buildSearchOR(['name', 'description', 'phone'], query.q),
 			}),
+			// Ocultas ficam visíveis apenas para donos (na sua própria listagem)
+			// e utilizadores privilegiados.
+			...(!privileged &&
+				!(viewer?.id && query.ownerId === viewer.id) && {
+					status: 'SHOW',
+				}),
 		};
 
 		const [total, businesses] = await Promise.all([

@@ -103,6 +103,13 @@ export class PaymentsController {
 		return this.paymentsService.review(user, id, dto);
 	}
 
+	@Get('mine')
+	@ApiOperation({ summary: 'Listar os meus pagamentos (dono das empresas)' })
+	async mine(@Req() req: Request) {
+		const user = await this.requireUser(req);
+		return this.paymentsService.mine(user.id);
+	}
+
 	@Get()
 	@RequirePermission({ payment: ['manage'] })
 	@ApiOperation({ summary: 'Listar todos os pagamentos (admin)' })

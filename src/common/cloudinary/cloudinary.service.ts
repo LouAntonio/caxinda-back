@@ -42,16 +42,17 @@ export class CloudinaryService {
 	}
 
 	getSignedUploadParams(options: SignParams = {}): SignParams {
+		const config = this.cloudinary.config();
 		const params: SignParams = {
 			...options,
-			api_key: String(this.cloudinary.config().api_key ?? ''),
+			api_key: String(config.api_key ?? ''),
 			timestamp: Math.floor(Date.now() / 1000),
 		};
 		const signature = this.cloudinary.utils.api_sign_request(
 			params,
-			this.cloudinary.config().api_secret ?? '',
+			config.api_secret ?? '',
 		);
-		return { ...params, signature };
+		return { ...params, signature, cloud_name: config.cloud_name ?? '' };
 	}
 
 	deleteResource(

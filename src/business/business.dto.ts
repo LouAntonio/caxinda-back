@@ -271,4 +271,11 @@ export class BusinessesQueryDto extends PaginationQueryDto {
 	@IsOptional()
 	@IsUUID('7', { message: 'categoryId deve ser um UUID' })
 	categoryId?: string;
+
+	@ApiPropertyOptional({
+		description: 'Filtrar por dono (empresas do próprio utilizador)',
+	})
+	@IsOptional()
+	@IsUUID('7', { message: 'ownerId deve ser um UUID' })
+	ownerId?: string;
 }

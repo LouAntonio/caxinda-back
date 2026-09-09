@@ -15,10 +15,12 @@ import type { Request, Response } from 'express';
 import { auth, sessionCookieOptions, signSessionToken } from '../libs/auth';
 import { prisma } from '../libs/prisma';
 import {
+	GoogleSignInDto,
 	MagicLinkRequestDto,
 	MagicLinkVerifyDto,
 	SetPasswordDto,
 } from './auth.dto';
+import { GoogleAuthService } from './services/google-auth.service';
 import { MagicLinkService } from './magic-link.service';
 import { translateAuthError } from '../libs/http-exceptions';
 import { Public } from './decorators/public.decorator';
@@ -37,7 +39,46 @@ const authThrottle = {
 @ApiTags('Auth')
 @Throttle(authThrottle)
 export class AuthController {
-	constructor(private readonly magicLinkService: MagicLinkService) {}
+	constructor(
+		private readonly magicLinkService: MagicLinkService,
+		private readonly googleAuthService: GoogleAuthService,
+	) {}
+
+	@Post('google')
+	@HttpCode(200)
+	@ApiOperation({
+		summary:
+			'Autenticar com ID token do Google (fluxo sem redirect — popup/one-tap)',
+	})
+	async google(
+		@Body() body: GoogleSignInDto,
+		@Res({ passthrough: true }) res: Response,
+	) {
+		try {
+			const result = await this.googleAuthService.authenticate(
+				body.credential,
+			);
+
+			const maxAge = Number(
+				process.env.BETTER_AUTH_SESSION_DURATION_MS ??
+					7 * 24 * 60 * 60 * 1000,
+			);
+			res.cookie(
+				'better-auth.session_token',
+				signSessionToken(result.sessionToken),
+				{
+					httpOnly: true,
+					path: '/',
+					maxAge,
+					...sessionCookieOptions,
+				},
+			);
+
+			return { status: true, ...result };
+		} catch (error) {
+			throw this.toHttpError(error);
+		}
+	}
 
 	@Post('magic-link/request')
 	@HttpCode(200)
