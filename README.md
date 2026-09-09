@@ -117,7 +117,12 @@ src/
 
 ## Autenticação e autorização
 
-- **Auth**: better-auth com magic link (email) e Google OAuth; sessões via cookie.
+- **Auth**: better-auth (email+senha, Google OAuth e magic link); sessões via cookie.
+- **Verificação de email**: o login por email+senha exige email verificado
+  (`requireEmailVerification`). Contas criadas via **Google** ou **magic link**
+  nascem verificadas; o registo por email+senha envia um link de verificação
+  (reenviado automaticamente em cada tentativa de login enquanto não verificado,
+  com `sendOnSignIn`).
 - **Guard global `PermissionsGuard`** (`APP_GUARD`): por omissão qualquer rota exige sessão.
   - `@Public()` — marca a rota (ou controller) como pública.
   - `@Roles(Role.ADMIN, ...)` — restringe a funções específicas.

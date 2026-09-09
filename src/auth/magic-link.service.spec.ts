@@ -12,6 +12,7 @@ jest.mock('../libs/prisma', () => ({
 		user: {
 			findFirst: jest.fn(),
 			create: jest.fn(),
+			update: jest.fn(),
 		},
 	},
 }));
@@ -191,7 +192,42 @@ describe('MagicLinkService', () => {
 			const result = await service.verify('valid-token');
 
 			expect(prisma.user.create).not.toHaveBeenCalled();
+			expect(prisma.user.update).not.toHaveBeenCalled();
 			expect(result.user).toEqual(existingUser);
+		});
+
+		it('marks an existing unverified user as verified', async () => {
+			const verification = {
+				id: 'ver-id',
+				identifier: 'magic-link:h',
+				value: 'unverified@example.com',
+				expiresAt: new Date(Date.now() + 60_000),
+			};
+			const unverifiedUser = {
+				id: 'existing-id',
+				name: 'unverified',
+				email: 'unverified@example.com',
+				emailVerified: false,
+				image: null,
+			};
+			const verifiedUser = { ...unverifiedUser, emailVerified: true };
+			(prisma.verification.findFirst as jest.Mock).mockResolvedValue(
+				verification,
+			);
+			(prisma.user.findFirst as jest.Mock).mockResolvedValue(
+				unverifiedUser,
+			);
+			(prisma.user.update as jest.Mock).mockResolvedValue(verifiedUser);
+			createSessionMock.mockResolvedValue({ token: 'session-token' });
+
+			const result = await service.verify('valid-token');
+
+			expect(prisma.user.update).toHaveBeenCalledWith({
+				where: { id: 'existing-id' },
+				data: { emailVerified: true },
+			});
+			expect(prisma.user.create).not.toHaveBeenCalled();
+			expect(result.user).toEqual(verifiedUser);
 		});
 
 		it('throws UnauthorizedException when no session is created', async () => {

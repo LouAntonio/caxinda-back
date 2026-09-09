@@ -91,6 +91,7 @@ export const auth = betterAuth({
 	},
 	emailAndPassword: {
 		enabled: true,
+		requireEmailVerification: true,
 		sendResetPassword: async ({ user, url }) => {
 			const token =
 				url.split('/reset-password/')[1]?.split('?')[0] ?? url;
@@ -108,6 +109,7 @@ export const auth = betterAuth({
 		},
 	},
 	emailVerification: {
+		sendOnSignIn: true,
 		sendVerificationEmail: async ({ user, url }) => {
 			await sendMailBridge({
 				to: user.email,

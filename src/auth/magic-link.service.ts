@@ -80,6 +80,11 @@ export class MagicLinkService {
 					emailVerified: true,
 				},
 			});
+		} else if (!user.emailVerified) {
+			user = await prisma.user.update({
+				where: { id: user.id },
+				data: { emailVerified: true },
+			});
 		}
 
 		await prisma.verification.deleteMany({
