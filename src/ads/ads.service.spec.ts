@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../common/prisma/prisma.module';
 import { CacheService } from '../cache/cache.service';
 import { MediaService } from '../media/media.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 jest.mock('../media/media.service', () => ({
 	MediaService: jest.fn(),
@@ -53,6 +54,10 @@ describe('AdsService', () => {
 
 	const media = {
 		enqueueDeletion: jest.fn(() => undefined),
+	};
+
+	const analytics = {
+		trackView: jest.fn(() => undefined),
 	};
 
 	const adRow = {
@@ -137,6 +142,7 @@ describe('AdsService', () => {
 				{ provide: PrismaService, useValue: prisma },
 				{ provide: CacheService, useValue: cache },
 				{ provide: MediaService, useValue: media },
+				{ provide: AnalyticsService, useValue: analytics },
 			],
 		}).compile();
 
@@ -552,6 +558,56 @@ describe('AdsService', () => {
 			expect(
 				(result as { distanceKm?: number | undefined }).distanceKm,
 			).toBeUndefined();
+		});
+
+		it('conta view para visitantes anônimos', async () => {
+			prisma.ad.findUnique.mockResolvedValue(adRow);
+
+			await service.getById('ad-1', null);
+
+			expect(analytics.trackView).toHaveBeenCalledWith(
+				'AD',
+				'ad-1',
+				null,
+			);
+		});
+
+		it('conta view servida do cache para visitantes anônimos', async () => {
+			cache.get.mockResolvedValue({
+				...adRow,
+				price: '250000',
+			});
+
+			await service.getById('ad-1', null);
+
+			expect(analytics.trackView).toHaveBeenCalledWith('AD', 'ad-1');
+		});
+
+		it('não conta view do próprio dono', async () => {
+			prisma.ad.findUnique.mockResolvedValue(adRow);
+
+			await service.getById('ad-1', owner);
+
+			expect(analytics.trackView).not.toHaveBeenCalled();
+		});
+
+		it('não conta view de ADMIN/MODERATOR', async () => {
+			prisma.ad.findUnique.mockResolvedValue(adRow);
+
+			await service.getById('ad-1', admin);
+
+			expect(analytics.trackView).not.toHaveBeenCalled();
+		});
+
+		it('não conta view de anúncio oculto', async () => {
+			prisma.ad.findUnique.mockResolvedValue({
+				...adRow,
+				visibility: 'HIDDEN',
+			});
+
+			await service.getById('ad-1', admin);
+
+			expect(analytics.trackView).not.toHaveBeenCalled();
 		});
 	});
 

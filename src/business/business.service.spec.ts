@@ -6,6 +6,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { PaymentsService } from '../payments/payments.service';
 import { BusinessesService } from './business.service';
 
@@ -38,6 +39,8 @@ function businessRow(overrides: Record<string, unknown> = {}) {
 		},
 		isVerified: false,
 		status: 'SHOW',
+		viewCount: 12,
+		clickCount: 3,
 		_count: { reviews: 0 },
 		createdAt: new Date(),
 		updatedAt: new Date(),
@@ -47,6 +50,7 @@ function businessRow(overrides: Record<string, unknown> = {}) {
 
 describe('BusinessesService', () => {
 	let service: BusinessesService;
+	let analytics: { trackView: jest.Mock };
 	let prisma: {
 		business: {
 			count: jest.Mock;
@@ -74,6 +78,8 @@ describe('BusinessesService', () => {
 			review: { groupBy: jest.fn().mockResolvedValue([]) },
 		};
 
+		analytics = { trackView: jest.fn() };
+
 		const moduleRef = await Test.createTestingModule({
 			providers: [
 				BusinessesService,
@@ -82,6 +88,7 @@ describe('BusinessesService', () => {
 					provide: PaymentsService,
 					useValue: { expireStaleSubscriptions: jest.fn() },
 				},
+				{ provide: AnalyticsService, useValue: analytics },
 			],
 		}).compile();
 
@@ -186,6 +193,32 @@ describe('BusinessesService', () => {
 			await expect(service.getBySlug('fantasma')).rejects.toThrow(
 				NotFoundException,
 			);
+		});
+
+		it('conta view da página de detalhes', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+
+			await service.getBySlug('loja', { id: 'visitor', role: 'USER' });
+
+			expect(analytics.trackView).toHaveBeenCalledWith(
+				'BUSINESS',
+				'biz-1',
+				{
+					id: 'visitor',
+					role: 'USER',
+				},
+			);
+		});
+
+		it('não conta view do próprio dono', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+
+			await service.getBySlug('loja', {
+				id: 'owner-1',
+				role: 'PROMOTER',
+			});
+
+			expect(analytics.trackView).not.toHaveBeenCalled();
 		});
 	});
 

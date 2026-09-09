@@ -1,528 +1,560 @@
 generator client {
-	provider     = "prisma-client"
-	output       = "../src/generated/prisma"
-	moduleFormat = "cjs"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
-	provider = "postgresql"
+  provider = "postgresql"
 }
 
 // --- ENUMS ---
 
 enum Role {
-	USER
-	ADMIN
-	MODERATOR
-	PROMOTER
+  USER
+  ADMIN
+  MODERATOR
+  PROMOTER
 }
 
 enum KYCStatus {
-	PENDING
-	APPROVED
-	REJECTED
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum AdStatus {
-	ACTIVE
-	SOLD
-	ARCHIVED
-	REJECTED
+  ACTIVE
+  SOLD
+  ARCHIVED
+  REJECTED
 }
 
 enum AdVisibility {
-	VISIBLE
-	HIDDEN
+  VISIBLE
+  HIDDEN
 }
 
 enum CategoryType {
-	AD
-	BUSINESS
+  AD
+  BUSINESS
 }
 
 enum BusinessStatus {
-	SHOW
-	HIDE
+  SHOW
+  HIDE
 }
 
 enum ConversationType {
-	AD
-	BUSINESS
-	SUPPORT
+  AD
+  BUSINESS
+  SUPPORT
 }
 
 enum Province {
-	BENGO
-	BENGUELA
-	BIÉ
-	CABINDA
-	CUANDO_CUBANGO
-	CUANZA_NORTE
-	CUANZA_SUL
-	CUNENE
-	HUAMBO
-	HUÍLA
-	LUANDA
-	LUNDA_NORTE
-	LUNDA_SUL
-	MALANJE
-	MOXICO
-	NAMIBE
-	UÍGE
-	ZAIRE
+  BENGO
+  BENGUELA
+  BIÉ
+  CABINDA
+  CUANDO_CUBANGO
+  CUANZA_NORTE
+  CUANZA_SUL
+  CUNENE
+  HUAMBO
+  HUÍLA
+  LUANDA
+  LUNDA_NORTE
+  LUNDA_SUL
+  MALANJE
+  MOXICO
+  NAMIBE
+  UÍGE
+  ZAIRE
 }
 
 enum SubscriptionStatus {
-	ACTIVE
-	PENDING
-	CANCELLED
-	EXPIRED
+  ACTIVE
+  PENDING
+  CANCELLED
+  EXPIRED
 }
 
 enum ReportTarget {
-	AD
-	USER
-	REVIEW
-	MESSAGE
+  AD
+  USER
+  REVIEW
+  MESSAGE
 }
 
 enum ReportReason {
-	SPAM
-	FRAUD
-	FAKE_AD
-	INAPPROPRIATE
-	DEFECTIVE_PRODUCT
-	NOT_AS_DESCRIBED
-	OTHER
+  SPAM
+  FRAUD
+  FAKE_AD
+  INAPPROPRIATE
+  DEFECTIVE_PRODUCT
+  NOT_AS_DESCRIBED
+  OTHER
 }
 
 enum ReportStatus {
-	PENDING
-	REVIEWED
-	RESOLVED
-	DISMISSED
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
 }
 
 enum PaymentStatus {
-	PENDING
-	UNDER_REVIEW
-	APPROVED
-	REJECTED
-	CANCELLED
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
 // --- CORE MODELS ---
 
 model User {
-	id            String    @id @db.Uuid
-	name          String
-	surname       String   @default("")
-	email         String   @unique
-	emailVerified Boolean   @default(false)
-	image         String?
-	createdAt     DateTime  @default(now())
-	updatedAt     DateTime  @updatedAt
-	lastLoginAt   DateTime?
+  id            String    @id @db.Uuid
+  name          String
+  surname       String    @default("")
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
 
-	role       Role      @default(USER)
-	banned     Boolean?  @default(false)
-	banReason  String?
-	banExpires DateTime?
+  role       Role      @default(USER)
+  banned     Boolean?  @default(false)
+  banReason  String?
+  banExpires DateTime?
 
-	phone      String? @unique
-	trustScore Float   @default(0.0)
-	isVerified Boolean @default(false)
+  phone      String? @unique
+  trustScore Float   @default(0.0)
+  isVerified Boolean @default(false)
 
-	// Relações
-	sessions         Session[]
-	accounts         Account[]
-	ads              Ad[]
-	businesses       Business[]
-	sentReviews      Review[]                  @relation("Reviewer")
-	receivedReviews  Review[]                  @relation("Reviewee")
-	conversations    ConversationParticipant[]
-	messages         Message[]
-	kyc              KYC?
-	reports          Report[]
-	wishlist         WishlistItem[]
-	subscriptions    Subscription[]
+  // Relações
+  sessions        Session[]
+  accounts        Account[]
+  ads             Ad[]
+  businesses      Business[]
+  sentReviews     Review[]                  @relation("Reviewer")
+  receivedReviews Review[]                  @relation("Reviewee")
+  conversations   ConversationParticipant[]
+  messages        Message[]
+  kyc             KYC?
+  reports         Report[]
+  wishlist        WishlistItem[]
+  subscriptions   Subscription[]
 
-	@@map("user")
+  @@map("user")
 }
 
 // --- KYC (IDENTIDADE VINCULADA AO CLOUDINARY) ---
 
 model KYC {
-	id     String @id @db.Uuid
-	userId String @unique @db.Uuid
-	user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-	status          KYCStatus @default(PENDING)
-	rejectionReason String? // Motivo caso seja rejeitado (ex: foto tremida)
+  status          KYCStatus @default(PENDING)
+  rejectionReason String? // Motivo caso seja rejeitado (ex: foto tremida)
 
-	// BI Frente
-	biFrontUrl String @db.VarChar(2048)
-	biFrontId  String @db.VarChar(255) // Cloudinary Public ID
+  // BI Frente
+  biFrontUrl String @db.VarChar(2048)
+  biFrontId  String @db.VarChar(255) // Cloudinary Public ID
 
-	// BI Verso
-	biBackUrl String @db.VarChar(2048)
-	biBackId  String @db.VarChar(255) // Cloudinary Public ID
+  // BI Verso
+  biBackUrl String @db.VarChar(2048)
+  biBackId  String @db.VarChar(255) // Cloudinary Public ID
 
-	// Selfies
-	selfies Json? @default("[]") @db.JsonB // Array de URLs e IDs do Cloudinary [{url, cloudinaryId}]
+  // Selfies
+  selfies Json? @default("[]") @db.JsonB // Array de URLs e IDs do Cloudinary [{url, cloudinaryId}]
 
-	verifiedAt DateTime?
-	createdAt  DateTime  @default(now())
-	updatedAt  DateTime  @updatedAt
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-	@@map("kyc")
+  @@map("kyc")
 }
 
 // --- PAGAMENTOS E CONFIGURAÇÃO DA PLATAFORMA ---
 
 model PlatformBankAccount {
-	id         String   @id @db.Uuid
-	bankName   String
-	bankHolder String
-	bankIban   String // IBAN
-	isActive   Boolean  @default(false) // apenas 1 ativa (garantido no serviço)
-	createdAt  DateTime @default(now())
-	updatedAt  DateTime @updatedAt
+  id         String   @id @db.Uuid
+  bankName   String
+  bankHolder String
+  bankIban   String // IBAN
+  isActive   Boolean  @default(false) // apenas 1 ativa (garantido no serviço)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-	@@map("platform_bank_account")
+  @@map("platform_bank_account")
 }
 
 model Payment {
-	id             String        @id @db.Uuid
-	subscriptionId String        @db.Uuid
-	amount         Decimal       @db.Decimal(12, 2)
-	status         PaymentStatus @default(PENDING)
+  id             String        @id @db.Uuid
+  subscriptionId String        @db.Uuid
+  amount         Decimal       @db.Decimal(12, 2)
+  status         PaymentStatus @default(PENDING)
 
-	// Snapshot da conta da plataforma usada naquele pagamento [{bankName, bankHolder, bankIban}]
-	platformAccount Json? @db.JsonB
+  // Snapshot da conta da plataforma usada naquele pagamento [{bankName, bankHolder, bankIban}]
+  platformAccount Json? @db.JsonB
 
-	// Comprovativo
-	proofUrl String? @db.VarChar(2048)
-	proofId  String? @db.VarChar(255) // Cloudinary Public ID
-	proofAt  DateTime?
+  // Comprovativo
+  proofUrl String?   @db.VarChar(2048)
+  proofId  String?   @db.VarChar(255) // Cloudinary Public ID
+  proofAt  DateTime?
 
-	// Revisão do admin
-	reviewedAt DateTime?
-	reviewedBy String? @db.Uuid
-	adminNote  String?
+  // Revisão do admin
+  reviewedAt DateTime?
+  reviewedBy String?   @db.Uuid
+  adminNote  String?
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-	subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
-	@@index([subscriptionId])
-	@@index([status])
-	@@map("payment")
+  @@index([subscriptionId])
+  @@index([status])
+  @@map("payment")
 }
 
 // --- MARKETPLACE ---
 
 model Ad {
-	id          String       @id @db.Uuid
-	slug        String       @unique
-	title       String
-	description String
-	price       Decimal?     @db.Decimal(12, 2)
-	status      AdStatus     @default(ACTIVE)
-	visibility  AdVisibility @default(VISIBLE)
-	verified    Boolean      @default(false)
-	createdAt   DateTime     @default(now())
-	updatedAt   DateTime     @updatedAt
+  id          String       @id @db.Uuid
+  slug        String       @unique
+  title       String
+  description String
+  price       Decimal?     @db.Decimal(12, 2)
+  status      AdStatus     @default(ACTIVE)
+  visibility  AdVisibility @default(VISIBLE)
+  verified    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-	// Rating agregado
-	averageRating Float?
-	reviewCount   Int      @default(0)
+  // Rating agregado
+  averageRating Float?
+  reviewCount   Int    @default(0)
 
-	// Destaque (benefício de plano)
-	featured      Boolean   @default(false)
-	featuredUntil DateTime?
-	featuredAt    DateTime?
+  // Destaque (benefício de plano)
+  featured      Boolean   @default(false)
+  featuredUntil DateTime?
+  featuredAt    DateTime?
 
-	// Mídia Principal
-	image   String? @db.VarChar(2048)
-	imageId String? @db.VarChar(255)
+  // Mídia Principal
+  image   String? @db.VarChar(2048)
+  imageId String? @db.VarChar(255)
 
-	// Galeria (JSONB) - [{url, cloudinaryId, type}]
-	gallery Json? @default("[]") @db.JsonB
+  // Galeria (JSONB) - [{url, cloudinaryId, type}]
+  gallery Json? @default("[]") @db.JsonB
 
-	userId       String       @db.Uuid
-	user         User         @relation(fields: [userId], references: [id])
-	categories   Category[]
-	conversations Conversation[]
-	reviews      Review[]
-	wishlistItems WishlistItem[]
+  // Analytics (totais de exibição, alimentados por job)
+  viewCount  Int @default(0)
+  clickCount Int @default(0)
 
-	@@index([featured, featuredUntil])
-	@@map("ad")
+  userId        String           @db.Uuid
+  user          User             @relation(fields: [userId], references: [id])
+  categories    Category[]
+  conversations Conversation[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+  analytics     AnalyticsDaily[]
+
+  @@index([featured, featuredUntil])
+  @@map("ad")
 }
 
 // --- RESTANTES MODELOS (SEM ALTERAÇÕES DE LÓGICA) ---
 
 model Session {
-	id             String   @id @db.Uuid
-	expiresAt      DateTime
-	token          String   @unique
-	createdAt      DateTime @default(now())
-	updatedAt      DateTime @updatedAt
-	ipAddress      String?
-	userAgent      String?
-	userId         String   @db.Uuid
-	user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-	impersonatedBy String?
+  id             String   @id @db.Uuid
+  expiresAt      DateTime
+  token          String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String   @db.Uuid
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
 
-	@@index([userId])
-	@@map("session")
+  @@index([userId])
+  @@map("session")
 }
 
 model Account {
-	id                    String    @id @db.Uuid
-	issuer                String
-	accountId             String
-	providerId            String
-	userId                String    @db.Uuid
-	user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-	accessToken           String?
-	refreshToken          String?
-	idToken               String?
-	accessTokenExpiresAt  DateTime?
-	refreshTokenExpiresAt DateTime?
-	scope                 String?
-	password              String?
-	createdAt             DateTime  @default(now())
-	updatedAt             DateTime  @updatedAt
+  id                    String    @id @db.Uuid
+  issuer                String
+  accountId             String
+  providerId            String
+  userId                String    @db.Uuid
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-	@@unique([issuer, accountId], map: "account_issuer_accountId_uidx")
-	@@index([userId])
-	@@map("account")
+  @@unique([issuer, accountId], map: "account_issuer_accountId_uidx")
+  @@index([userId])
+  @@map("account")
 }
 
 model Verification {
-	id         String   @id @db.Uuid
-	identifier String
-	value      String
-	expiresAt  DateTime
-	createdAt  DateTime @default(now())
-	updatedAt  DateTime @updatedAt
+  id         String   @id @db.Uuid
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-	@@index([identifier])
-	@@map("verification")
+  @@index([identifier])
+  @@map("verification")
 }
 
 model Category {
-	id   String       @id @db.Uuid
-	slug String       @unique
-	name String
-	type CategoryType @default(AD)
-	ads  Ad[]
-	businesses Business[]
+  id         String       @id @db.Uuid
+  slug       String       @unique
+  name       String
+  type       CategoryType @default(AD)
+  ads        Ad[]
+  businesses Business[]
 
-	@@map("category")
+  @@map("category")
 }
 
 // --- BUSINESS (EMPRESAS GERIDAS POR PROMOTERS) ---
 
 model Business {
-	id          String        @id @db.Uuid
-	ownerId     String        @db.Uuid
-	owner       User          @relation(fields: [ownerId], references: [id])
+  id      String @id @db.Uuid
+  ownerId String @db.Uuid
+  owner   User   @relation(fields: [ownerId], references: [id])
 
-	name        String
-	slug        String        @unique
-	description String        @db.Text
-	address     String?
-	province    Province
+  name        String
+  slug        String   @unique
+  description String   @db.Text
+  address     String?
+  province    Province
 
-	// Contactos
-	phone   String
-	whatsapp String?
-	email   String?
-	website String?
+  // Contactos
+  phone    String
+  whatsapp String?
+  email    String?
+  website  String?
 
-	// Media (Cloudinary)
-	logoUrl  String? @db.VarChar(2048)
-	logoId   String? @db.VarChar(255) // Cloudinary Public ID
-	coverUrl String? @db.VarChar(2048)
-	coverId  String? @db.VarChar(255) // Cloudinary Public ID
-	gallery  Json?   @default("[]") @db.JsonB
+  // Media (Cloudinary)
+  logoUrl  String? @db.VarChar(2048)
+  logoId   String? @db.VarChar(255) // Cloudinary Public ID
+  coverUrl String? @db.VarChar(2048)
+  coverId  String? @db.VarChar(255) // Cloudinary Public ID
+  gallery  Json?   @default("[]") @db.JsonB
 
-	// Business Logic
-	categoryId String         @db.Uuid
-	category   Category       @relation(fields: [categoryId], references: [id])
-	isVerified Boolean        @default(false)
-	status     BusinessStatus @default(SHOW)
+  // Business Logic
+  categoryId String         @db.Uuid
+  category   Category       @relation(fields: [categoryId], references: [id])
+  isVerified Boolean        @default(false)
+  status     BusinessStatus @default(SHOW)
 
-	reviews         Review[]
-	subscriptions   Subscription[]
-	conversations   Conversation[]
-	createdAt       DateTime @default(now())
-	updatedAt       DateTime @updatedAt
+  // Analytics (totais de exibição, alimentados por job)
+  viewCount  Int @default(0)
+  clickCount Int @default(0)
 
-	@@index([status])
-	@@index([province])
-	@@index([categoryId])
-	@@map("business")
+  reviews       Review[]
+  subscriptions Subscription[]
+  conversations Conversation[]
+  analytics     AnalyticsDaily[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([status])
+  @@index([province])
+  @@index([categoryId])
+  @@map("business")
+}
+
+// --- ANALYTICS (AGGREGAÇÃO DIÁRIA DE VIEWS E CLIQUES) ---
+
+model AnalyticsDaily {
+  id          String   @id @db.Uuid
+  adId        String?  @db.Uuid
+  businessId  String?  @db.Uuid
+  date        DateTime @db.Date // Dia (sem hora)
+  views       Int      @default(0)
+  uniqueViews Int      @default(0)
+  clicks      Json?    @default("[]") @db.JsonB // [{channel, count}]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ad       Ad?       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([adId, date])
+  @@unique([businessId, date])
+  @@index([date]) // Poda diária (retenção)
+  @@map("analytics_daily")
 }
 
 model Conversation {
-	id          String           @id @db.Uuid
-	type        ConversationType @default(AD)
-	adId        String?          @db.Uuid
-	businessId  String?          @db.Uuid
-	ad          Ad?              @relation(fields: [adId], references: [id])
-	business    Business?        @relation(fields: [businessId], references: [id])
-	createdAt   DateTime         @default(now())
-	updatedAt   DateTime         @updatedAt
+  id         String           @id @db.Uuid
+  type       ConversationType @default(AD)
+  adId       String?          @db.Uuid
+  businessId String?          @db.Uuid
+  ad         Ad?              @relation(fields: [adId], references: [id])
+  business   Business?        @relation(fields: [businessId], references: [id])
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
-	participants ConversationParticipant[]
-	messages     Message[]
+  participants ConversationParticipant[]
+  messages     Message[]
 
-	@@index([type])
-	@@index([adId])
-	@@index([businessId])
-	@@map("conversation")
+  @@index([type])
+  @@index([adId])
+  @@index([businessId])
+  @@map("conversation")
 }
 
 model ConversationParticipant {
-	id             String       @id @db.Uuid
-	conversationId String       @db.Uuid
-	conversation   Conversation @relation(fields: [conversationId], references: [id])
-	userId         String       @db.Uuid
-	user           User         @relation(fields: [userId], references: [id])
+  id             String       @id @db.Uuid
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  userId         String       @db.Uuid
+  user           User         @relation(fields: [userId], references: [id])
 
-	@@unique([conversationId, userId])
-	@@map("conversation_participant")
+  @@unique([conversationId, userId])
+  @@map("conversation_participant")
 }
 
 model Message {
-	id             String       @id @db.Uuid
-	content        String
-	createdAt      DateTime     @default(now())
-	senderId       String       @db.Uuid
-	sender         User         @relation(fields: [senderId], references: [id])
-	conversationId String       @db.Uuid
-	conversation   Conversation @relation(fields: [conversationId], references: [id])
-	isRead         Boolean      @default(false)
-	media          Json?        @default("[]") @db.JsonB
+  id             String       @id @db.Uuid
+  content        String
+  createdAt      DateTime     @default(now())
+  senderId       String       @db.Uuid
+  sender         User         @relation(fields: [senderId], references: [id])
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  isRead         Boolean      @default(false)
+  media          Json?        @default("[]") @db.JsonB
 
-	@@index([conversationId, createdAt])
-	@@index([conversationId, isRead])
-	@@map("message")
+  @@index([conversationId, createdAt])
+  @@index([conversationId, isRead])
+  @@map("message")
 }
 
 model Review {
-	id         String   @id @db.Uuid
-	rating     Int      @default(5)
-	comment    String?
-	response   String?
-	adId       String?  @db.Uuid
-	businessId String?  @db.Uuid
-	reviewerId String   @db.Uuid
-	revieweeId String   @db.Uuid
-	createdAt  DateTime @default(now())
-	updatedAt  DateTime @updatedAt
+  id         String   @id @db.Uuid
+  rating     Int      @default(5)
+  comment    String?
+  response   String?
+  adId       String?  @db.Uuid
+  businessId String?  @db.Uuid
+  reviewerId String   @db.Uuid
+  revieweeId String   @db.Uuid
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-	reviewer User     @relation("Reviewer", fields: [reviewerId], references: [id])
-	reviewee User     @relation("Reviewee", fields: [revieweeId], references: [id])
-	ad       Ad?      @relation(fields: [adId], references: [id], onDelete: Cascade)
-	business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  reviewer User      @relation("Reviewer", fields: [reviewerId], references: [id])
+  reviewee User      @relation("Reviewee", fields: [revieweeId], references: [id])
+  ad       Ad?       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-	@@unique([reviewerId, adId])
-	@@unique([reviewerId, businessId])
-	@@index([revieweeId])
-	@@index([reviewerId])
-	@@index([adId])
-	@@index([businessId])
-	@@map("review")
+  @@unique([reviewerId, adId])
+  @@unique([reviewerId, businessId])
+  @@index([revieweeId])
+  @@index([reviewerId])
+  @@index([adId])
+  @@index([businessId])
+  @@map("review")
 }
 
 // --- REPORTS ---
 
 model Report {
-	id          String       @id @db.Uuid
-	targetType  ReportTarget
-	targetId    String       @db.Uuid
-	reason      ReportReason
-	description String?
-	media       Json?        @default("[]") @db.JsonB
-	status      ReportStatus @default(PENDING)
-	reporterId  String       @db.Uuid
-	createdAt   DateTime     @default(now())
-	updatedAt   DateTime     @updatedAt
+  id          String       @id @db.Uuid
+  targetType  ReportTarget
+  targetId    String       @db.Uuid
+  reason      ReportReason
+  description String?
+  media       Json?        @default("[]") @db.JsonB
+  status      ReportStatus @default(PENDING)
+  reporterId  String       @db.Uuid
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-	reporter User @relation(fields: [reporterId], references: [id])
+  reporter User @relation(fields: [reporterId], references: [id])
 
-	@@unique([reporterId, targetType, targetId])
-	@@index([targetType, targetId])
-	@@index([status])
-	@@index([reporterId])
-	@@map("report")
+  @@unique([reporterId, targetType, targetId])
+  @@index([targetType, targetId])
+  @@index([status])
+  @@index([reporterId])
+  @@map("report")
 }
 
 // --- WISHLIST ---
 
 model WishlistItem {
-	id        String   @id @db.Uuid
-	userId    String   @db.Uuid
-	adId      String   @db.Uuid
-	createdAt DateTime @default(now())
+  id        String   @id @db.Uuid
+  userId    String   @db.Uuid
+  adId      String   @db.Uuid
+  createdAt DateTime @default(now())
 
-	user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-	ad   Ad   @relation(fields: [adId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ad   Ad   @relation(fields: [adId], references: [id], onDelete: Cascade)
 
-	@@unique([userId, adId])
-	@@index([userId])
-	@@index([adId])
-	@@map("wishlist_item")
+  @@unique([userId, adId])
+  @@index([userId])
+  @@index([adId])
+  @@map("wishlist_item")
 }
 
 model Plan {
-	id                     String       @id @db.Uuid
-	name                   String
-	description            String?
-	price                  Decimal      @db.Decimal(12, 2)
-	benefits               String[]     @default([])
-	currency               String       @default("AOA")
-	durationDays           Int          @default(30)
-	businessVisibilityLimit Int         @default(1)
-	featuredAdsLimit       Int          @default(0)
-	isActive               Boolean      @default(true)
-	createdAt              DateTime     @default(now())
-	updatedAt              DateTime     @updatedAt
+  id                      String   @id @db.Uuid
+  name                    String
+  description             String?
+  price                   Decimal  @db.Decimal(12, 2)
+  benefits                String[] @default([])
+  currency                String   @default("AOA")
+  durationDays            Int      @default(30)
+  businessVisibilityLimit Int      @default(1)
+  featuredAdsLimit        Int      @default(0)
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-	subscriptions Subscription[]
+  subscriptions Subscription[]
 
-	@@index([isActive])
-	@@map("plan")
+  @@index([isActive])
+  @@map("plan")
 }
 
 model Subscription {
-	id        String             @id @db.Uuid
-	userId    String             @db.Uuid
-	businessId String            @db.Uuid
-	planId    String             @db.Uuid
-	status    SubscriptionStatus @default(PENDING)
-	startDate DateTime           @default(now())
-	endDate   DateTime
-	autoRenew Boolean            @default(false)
-	cancelledAt DateTime?
-	renewedAt   DateTime?
-	createdAt   DateTime         @default(now())
-	updatedAt   DateTime         @updatedAt
+  id          String             @id @db.Uuid
+  userId      String             @db.Uuid
+  businessId  String             @db.Uuid
+  planId      String             @db.Uuid
+  status      SubscriptionStatus @default(PENDING)
+  startDate   DateTime           @default(now())
+  endDate     DateTime
+  autoRenew   Boolean            @default(false)
+  cancelledAt DateTime?
+  renewedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
-	user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-	business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
-	plan       Plan       @relation(fields: [planId], references: [id], onDelete: Restrict)
-	payments   Payment[]
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments Payment[]
 
-	@@index([userId])
-	@@index([businessId])
-	@@index([planId])
-	@@index([status])
-	@@map("subscription")
+  @@index([userId])
+  @@index([businessId])
+  @@index([planId])
+  @@index([status])
+  @@map("subscription")
 }

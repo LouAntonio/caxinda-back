@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { PaymentsService } from '../payments/payments.service';
 import { newId } from '../libs/id';
 import { slugify } from '../categories/categories.service';
@@ -61,6 +62,7 @@ export class BusinessesService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly paymentsService: PaymentsService,
+		private readonly analytics: AnalyticsService,
 	) {}
 
 	async listPublic(query: BusinessesQueryDto, viewer?: BusinessSessionUser) {
@@ -110,6 +112,13 @@ export class BusinessesService {
 		if (!business || !this.canView(business, viewer)) {
 			throw new NotFoundException('Empresa não encontrada.');
 		}
+		if (
+			business.status === 'SHOW' &&
+			viewer?.id !== business.ownerId &&
+			!this.isPrivileged(viewer)
+		) {
+			void this.analytics.trackView('BUSINESS', business.id, viewer);
+		}
 		const [item] = await this.toPublicBusinesses([business]);
 		return item;
 	}
@@ -122,6 +131,13 @@ export class BusinessesService {
 		});
 		if (!business || !this.canView(business, viewer)) {
 			throw new NotFoundException('Empresa não encontrada.');
+		}
+		if (
+			business.status === 'SHOW' &&
+			viewer?.id !== business.ownerId &&
+			!this.isPrivileged(viewer)
+		) {
+			void this.analytics.trackView('BUSINESS', business.id, viewer);
 		}
 		const [item] = await this.toPublicBusinesses([business]);
 		return item;
@@ -430,6 +446,8 @@ export class BusinessesService {
 			owner: business.owner,
 			isVerified: business.isVerified,
 			status: business.status,
+			viewCount: business.viewCount,
+			clickCount: business.clickCount,
 			reviewCount: stats?.reviewCount ?? business._count.reviews,
 			averageRating: stats?.averageRating ?? null,
 			createdAt: business.createdAt,
@@ -474,6 +492,8 @@ export interface PublicBusiness {
 	};
 	isVerified: boolean;
 	status: string;
+	viewCount: number;
+	clickCount: number;
 	reviewCount: number;
 	averageRating: number | null;
 	createdAt: Date;

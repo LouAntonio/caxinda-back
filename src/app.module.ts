@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { WinstonModule } from 'nest-winston';
 import { AdsModule } from './ads/ads.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -57,6 +58,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
 		CacheModule,
 		AuthModule,
 		AdsModule,
+		AnalyticsModule,
 		BusinessModule,
 		CategoriesModule,
 		ChatsModule,

@@ -19,6 +19,7 @@ import {
 	UpdateVisibilityDto,
 } from './ads.dto';
 import { slugify } from '../categories/categories.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 export interface AdSessionUser {
 	id: string;
@@ -46,6 +47,7 @@ interface CacheableAd {
 	imageId: string | null;
 	gallery: unknown;
 	userId: string;
+	viewCount: number;
 	categories: unknown[];
 	user: unknown;
 }
@@ -86,6 +88,7 @@ export class AdsService {
 		private readonly prisma: PrismaService,
 		private readonly cache: CacheService,
 		private readonly media: MediaService,
+		private readonly analytics: AnalyticsService,
 	) {}
 
 	private isPrivileged(viewer?: AdSessionUser | null): boolean {
@@ -318,6 +321,7 @@ export class AdsService {
 		if (!proximity && (viewer === null || viewer === undefined)) {
 			const cached = await this.cache.get<CacheableAd>(`ad:${id}`);
 			if (cached) {
+				void this.analytics.trackView('AD', id);
 				return this.withLocation(this.restoreAd(cached), id);
 			}
 		}
@@ -336,6 +340,10 @@ export class AdsService {
 
 		if (!visible && !isOwner && !this.isPrivileged(viewer)) {
 			throw new NotFoundException('Anúncio não encontrado.');
+		}
+
+		if (visible && !isOwner && !this.isPrivileged(viewer)) {
+			void this.analytics.trackView('AD', ad.id, viewer);
 		}
 
 		if (
@@ -366,6 +374,7 @@ export class AdsService {
 		if (!proximity && (viewer === null || viewer === undefined)) {
 			const cached = await this.cache.get<CacheableAd>(cachedKey);
 			if (cached) {
+				void this.analytics.trackView('AD', cached.id);
 				return this.withLocation(this.restoreAd(cached), cached.id);
 			}
 		}
@@ -384,6 +393,10 @@ export class AdsService {
 
 		if (!visible && !isOwner && !this.isPrivileged(viewer)) {
 			throw new NotFoundException('Anúncio não encontrado.');
+		}
+
+		if (visible && !isOwner && !this.isPrivileged(viewer)) {
+			void this.analytics.trackView('AD', ad.id, viewer);
 		}
 
 		if (
@@ -855,6 +868,7 @@ export class AdsService {
 			reviewCount: number;
 			featured: boolean;
 			featuredUntil: Date | null;
+			viewCount: number;
 		},
 		distanceMeters?: number,
 	) {
@@ -877,6 +891,7 @@ export class AdsService {
 			reviewCount: ad.reviewCount,
 			featured: ad.featured,
 			featuredUntil: ad.featuredUntil,
+			views: ad.viewCount,
 			distanceKm:
 				distanceMeters === undefined
 					? undefined
