@@ -27,7 +27,7 @@ import {
 } from './business.dto';
 import { BusinessesService, BusinessSessionUser } from './business.service';
 
-@Controller('api/businesses')
+@Controller('businesses')
 @ApiTags('Empresas')
 export class BusinessesController {
 	constructor(private readonly businessesService: BusinessesService) {}

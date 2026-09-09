@@ -15,8 +15,13 @@ describe('AppController', () => {
 	});
 
 	describe('root', () => {
-		it('should return "Hello World!"', () => {
-			expect(appController.getHello()).toBe('Hello World!');
+		it('should return API status with uptime and timestamp', () => {
+			const result = appController.getStatus();
+
+			expect(result.status).toBe('API online');
+			expect(typeof result.uptime).toBe('number');
+			expect(result.uptime).toBeGreaterThanOrEqual(0);
+			expect(new Date(result.timestamp).getTime()).not.toBeNaN();
 		});
 	});
 });

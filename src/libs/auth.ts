@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { admin as adminPlugin, bearer } from 'better-auth/plugins';
+import { admin as adminPlugin, bearer, openAPI } from 'better-auth/plugins';
 import { newId } from './id';
 import { sendMailBridge } from './mail';
 import { prisma } from './prisma';
@@ -125,6 +125,9 @@ export const auth = betterAuth({
 		// permite autenticar via Authorization: Bearer <sessionToken>,
 		// guardado em localStorage pelos SPAs.
 		bearer(),
+		openAPI({
+			disableDefaultReference: true,
+		}),
 		adminPlugin({
 			ac,
 			roles: {

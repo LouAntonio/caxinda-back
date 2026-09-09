@@ -30,7 +30,7 @@ import {
 } from './ads.dto';
 import { AdSessionUser, AdsService } from './ads.service';
 
-@Controller('api/ads')
+@Controller('ads')
 @ApiTags('Anúncios')
 export class AdsController {
 	constructor(private readonly adsService: AdsService) {}

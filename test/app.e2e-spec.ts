@@ -16,11 +16,14 @@ describe('AppController (e2e)', () => {
 		await app.init();
 	});
 
-	it('/ (GET)', () => {
-		return request(app.getHttpServer())
+	it('/ (GET) retorna o estado da API', async () => {
+		const response = await request(app.getHttpServer())
 			.get('/')
-			.expect(200)
-			.expect('Hello World!');
+			.expect(200);
+
+		expect(response.body.status).toBe('API online');
+		expect(typeof response.body.uptime).toBe('number');
+		expect(typeof response.body.timestamp).toBe('string');
 	});
 
 	afterEach(async () => {

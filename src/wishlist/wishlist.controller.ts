@@ -19,7 +19,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { AddWishlistDto, WishlistQueryDto } from './wishlist.dto';
 import { WishlistService } from './wishlist.service';
 
-@Controller('api/wishlist')
+@Controller('wishlist')
 @ApiTags('Lista de desejos')
 @UseGuards(PermissionsGuard)
 export class WishlistController {

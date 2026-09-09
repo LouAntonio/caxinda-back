@@ -25,7 +25,7 @@ import { ChatsService } from './chat.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/roles';
 
-@Controller('api/conversations')
+@Controller('conversations')
 @ApiTags('Chat')
 @UseGuards(PermissionsGuard)
 export class ChatsController {

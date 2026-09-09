@@ -25,7 +25,7 @@ import {
 } from './payments.dto';
 import { PaymentsService, PaymentSessionUser } from './payments.service';
 
-@Controller('api/payments')
+@Controller('payments')
 @ApiTags('Pagamentos')
 export class PaymentsController {
 	constructor(private readonly paymentsService: PaymentsService) {}

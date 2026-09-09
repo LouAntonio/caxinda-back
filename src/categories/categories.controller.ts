@@ -17,7 +17,7 @@ import { CategoryType } from '../generated/prisma/client';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './categories.dto';
 
-@Controller('api/categories')
+@Controller('categories')
 @ApiTags('Categorias')
 export class CategoriesController {
 	constructor(private readonly categoriesService: CategoriesService) {}

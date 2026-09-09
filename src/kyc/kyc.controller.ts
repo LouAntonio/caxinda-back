@@ -19,7 +19,7 @@ import { RequirePermission } from '../auth/decorators/roles.decorator';
 import { ListKycQueryDto, ReviewKycDto, SubmitKycDto } from './kyc.dto';
 import { KycService } from './kyc.service';
 
-@Controller('api/kyc')
+@Controller('kyc')
 @ApiTags('KYC')
 export class KycController {
 	constructor(private readonly kycService: KycService) {}

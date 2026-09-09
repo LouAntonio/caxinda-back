@@ -19,7 +19,7 @@ import { RequirePermission } from '../auth/decorators/roles.decorator';
 import { AnalyticsRangeDto, TrackBusinessClickDto } from './analytics.dto';
 import { AnalyticsService, AnalyticsSessionUser } from './analytics.service';
 
-@Controller('api/analytics')
+@Controller('analytics')
 @ApiTags('Analytics')
 export class AnalyticsController {
 	constructor(private readonly analyticsService: AnalyticsService) {}
