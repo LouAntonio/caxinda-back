@@ -8,20 +8,17 @@ import {
 	Post,
 	Query,
 	Req,
-	UseGuards,
 	UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { AddWishlistDto, WishlistQueryDto } from './wishlist.dto';
 import { WishlistService } from './wishlist.service';
 
 @Controller('wishlist')
 @ApiTags('Lista de desejos')
-@UseGuards(PermissionsGuard)
 export class WishlistController {
 	constructor(private readonly wishlistService: WishlistService) {}
 

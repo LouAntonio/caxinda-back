@@ -7,14 +7,13 @@ import {
 	Post,
 	Query,
 	Req,
-	UseGuards,
 	UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { RequirePermission } from '../auth/decorators/roles.decorator';
 import {
 	CreateReportDto,
@@ -50,7 +49,6 @@ export class ReportsController {
 
 	@Post()
 	@ApiOperation({ summary: 'Criar uma denúncia' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ report: ['create'] })
 	async create(@Req() req: Request, @Body() dto: CreateReportDto) {
 		const user = await this.requireUser(req);
@@ -58,6 +56,7 @@ export class ReportsController {
 	}
 
 	@Get('count')
+	@Public()
 	@ApiOperation({
 		summary: 'Contagem de denúncias ativas de um alvo (público)',
 	})
@@ -67,7 +66,6 @@ export class ReportsController {
 
 	@Get('mine')
 	@ApiOperation({ summary: 'Listar as próprias denúncias (autenticado)' })
-	@UseGuards(PermissionsGuard)
 	async listMine(@Req() req: Request, @Query() query: ReportsQueryDto) {
 		const user = await this.requireUser(req);
 		return this.reportsService.listMine(user.id, query);
@@ -75,7 +73,6 @@ export class ReportsController {
 
 	@Get()
 	@ApiOperation({ summary: 'Listar denúncias (moderador)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ report: ['list'] })
 	async list(@Req() req: Request, @Query() query: ReportsQueryDto) {
 		const user = await this.requireUser(req);
@@ -84,7 +81,6 @@ export class ReportsController {
 
 	@Patch(':id/status')
 	@ApiOperation({ summary: 'Atualizar status de uma denúncia (moderador)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ report: ['moderate'] })
 	async updateStatus(
 		@Req() req: Request,

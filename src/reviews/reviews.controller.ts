@@ -9,14 +9,13 @@ import {
 	Post,
 	Query,
 	Req,
-	UseGuards,
 	UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { RequirePermission } from '../auth/decorators/roles.decorator';
 import {
 	CreateReviewDto,
@@ -50,6 +49,7 @@ export class ReviewsController {
 	}
 
 	@Get()
+	@Public()
 	@ApiOperation({ summary: 'Listar avaliações (público)' })
 	async list(@Query() query: ReviewsQueryDto) {
 		return this.reviewsService.list(query);
@@ -57,7 +57,6 @@ export class ReviewsController {
 
 	@Post()
 	@ApiOperation({ summary: 'Criar avaliação para um anúncio' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ review: ['create'] })
 	async create(@Req() req: Request, @Body() dto: CreateReviewDto) {
 		const user = await this.requireUser(req);
@@ -66,7 +65,6 @@ export class ReviewsController {
 
 	@Patch(':id/response')
 	@ApiOperation({ summary: 'Responder a uma avaliação (dono do anúncio)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ review: ['create'] })
 	async respond(
 		@Req() req: Request,
@@ -80,7 +78,6 @@ export class ReviewsController {
 	@Delete(':id')
 	@ApiOperation({ summary: 'Remover avaliação (autor ou moderador)' })
 	@HttpCode(204)
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ review: ['delete'] })
 	async remove(@Req() req: Request, @Param('id') id: string) {
 		const user = await this.requireUser(req);

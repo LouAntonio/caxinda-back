@@ -9,7 +9,7 @@ import {
 	MaxLength,
 	Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 export class CreateReviewDto {
 	@ApiPropertyOptional({ example: '00000000-0000-7000-8000-000000000001' })
@@ -45,7 +45,7 @@ export class RespondReviewDto {
 	response: string;
 }
 
-export class ReviewsQueryDto {
+export class ReviewsQueryDto extends PaginationQueryDto {
 	@ApiPropertyOptional({ description: 'Filtrar por anúncio' })
 	@IsOptional()
 	@IsUUID('7', { message: 'adId deve ser um UUID' })
@@ -60,21 +60,6 @@ export class ReviewsQueryDto {
 	@IsOptional()
 	@IsUUID('7', { message: 'revieweeId deve ser um UUID' })
 	revieweeId?: string;
-
-	@ApiPropertyOptional({ default: 1 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	page?: number;
-
-	@ApiPropertyOptional({ default: 20 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	@Max(50)
-	limit?: number;
 }
 
 export interface ReviewSessionUser {

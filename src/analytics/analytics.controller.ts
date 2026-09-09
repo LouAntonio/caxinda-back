@@ -7,14 +7,13 @@ import {
 	Query,
 	Req,
 	UnauthorizedException,
-	UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { RequirePermission } from '../auth/decorators/roles.decorator';
 import { AnalyticsRangeDto, TrackBusinessClickDto } from './analytics.dto';
 import { AnalyticsService, AnalyticsSessionUser } from './analytics.service';
@@ -48,6 +47,7 @@ export class AnalyticsController {
 	}
 
 	@Post('business-click')
+	@Public()
 	@Throttle({ default: { limit: 20, ttl: 60_000 } })
 	@ApiOperation({
 		summary: 'Registar clique num contacto de empresa (público)',
@@ -97,7 +97,6 @@ export class AnalyticsController {
 	}
 
 	@Get('platform')
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ business: ['moderate'] })
 	@ApiOperation({
 		summary: 'Estatísticas da plataforma (ADMIN/MODERATOR)',

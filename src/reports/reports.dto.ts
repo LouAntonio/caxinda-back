@@ -3,14 +3,11 @@ import {
 	ArrayMaxSize,
 	IsArray,
 	IsEnum,
-	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUUID,
-	Max,
 	MaxLength,
-	Min,
 	ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -19,6 +16,7 @@ import {
 	ReportStatus,
 	ReportTarget,
 } from '../generated/prisma/client';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 export class ReportMediaDto {
 	@ApiProperty({ example: 'https://cdn.test/rep.jpg' })
@@ -87,7 +85,7 @@ export class UpdateReportStatusDto {
 	status: ReportStatus;
 }
 
-export class ReportsQueryDto {
+export class ReportsQueryDto extends PaginationQueryDto {
 	@ApiPropertyOptional({ enum: ReportStatus })
 	@IsOptional()
 	@IsEnum(ReportStatus, { message: 'status inválido' })
@@ -102,21 +100,6 @@ export class ReportsQueryDto {
 	@IsOptional()
 	@IsUUID('7', { message: 'targetId deve ser um UUID' })
 	targetId?: string;
-
-	@ApiPropertyOptional({ default: 1 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	page?: number;
-
-	@ApiPropertyOptional({ default: 20 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	@Max(50)
-	limit?: number;
 }
 
 export class ReportCountQueryDto {

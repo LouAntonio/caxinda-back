@@ -14,6 +14,8 @@ import { ChatsService } from './chat.service';
 import { SendMessageDto } from './chat.dto';
 
 const TYPING_THROTTLE_MS = 2000;
+const STAFF_ROOM = 'staff';
+const STAFF_ROLES = ['ADMIN', 'MODERATOR'];
 
 function conversationRoom(id: string): string {
 	return `conversation:${id}`;
@@ -73,6 +75,9 @@ export class ChatsGateway {
 			data.userId = session.user.id;
 			data.conversations = new Set<string>();
 			void socket.join(userRoom(session.user.id));
+			if (STAFF_ROLES.includes(session.user.role as string)) {
+				void socket.join(STAFF_ROOM);
+			}
 			this.presenceUpdate(session.user.id, socket.id, true);
 		} catch {
 			socket.disconnect(true);
@@ -133,6 +138,12 @@ export class ChatsGateway {
 
 	private isOnline(userId: string): boolean {
 		return (this.presence.get(userId)?.size ?? 0) > 0;
+	}
+
+	notifyNewSupportConversation(conversationId: string): void {
+		this.server
+			.to(STAFF_ROOM)
+			.emit('conversation:new-support', { conversationId });
 	}
 
 	@SubscribeMessage('conversation:join')

@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import {
 	BadRequestException,
+	ConflictException,
 	ForbiddenException,
 	NotFoundException,
 } from '@nestjs/common';
@@ -294,6 +295,43 @@ describe('ChatsService', () => {
 				}),
 			).rejects.toThrow(BadRequestException);
 		});
+
+		it('reutiliza apenas conversa SUPPORT aberta ou em progresso', async () => {
+			prisma.conversation.findFirst.mockResolvedValue({
+				id: 'conv-supp-open',
+			});
+
+			const result = await service.createConversation('user-2', {
+				type: 'SUPPORT' as const,
+			});
+
+			expect(result).toEqual({
+				id: 'conv-supp-open',
+				created: false,
+			});
+			expect(prisma.conversation.findFirst).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.objectContaining({
+						type: 'SUPPORT',
+						status: { in: ['OPEN', 'IN_PROGRESS'] },
+					}),
+				}),
+			);
+		});
+
+		it('abre nova conversa SUPPORT quando a anterior está RESOLVED', async () => {
+			prisma.conversation.findFirst.mockResolvedValue(null);
+			prisma.conversation.create.mockResolvedValue({
+				id: 'conv-supp-new',
+			});
+
+			const result = await service.createConversation('user-2', {
+				type: 'SUPPORT' as const,
+			});
+
+			expect(result).toEqual({ id: 'conv-supp-new', created: true });
+			expect(prisma.conversation.create).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	describe('listConversations', () => {
@@ -581,6 +619,93 @@ describe('ChatsService', () => {
 
 			expect(result.message.id).toBe('msg-media');
 		});
+
+		it('conversa SUPPORT não atribuída não tem otherUserId', async () => {
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				status: 'OPEN',
+				assignedToId: null,
+				participants: [{ userId: 'user-2' }],
+			});
+			prisma.message.create.mockResolvedValue({
+				id: 'msg-support',
+				content: 'Preciso de ajuda',
+				createdAt: new Date(),
+				senderId: 'user-2',
+				isRead: false,
+				media: [],
+			});
+			prisma.conversation.update.mockResolvedValue({});
+			prisma.message.count.mockResolvedValue(0);
+
+			const result = await service.sendMessage('user-2', 'conv-supp', {
+				content: 'Preciso de ajuda',
+			});
+
+			expect(result.message.id).toBe('msg-support');
+			expect(result.otherUserId).toBeUndefined();
+			expect(result.unreadCount).toBe(0);
+		});
+
+		it('conversa SUPPORT atribuída notifica o agente assignedTo', async () => {
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				status: 'IN_PROGRESS',
+				assignedToId: 'staff-1',
+				participants: [{ userId: 'user-2' }, { userId: 'staff-1' }],
+			});
+			prisma.message.create.mockResolvedValue({
+				id: 'msg-support-assigned',
+				content: 'Oi',
+				createdAt: new Date(),
+				senderId: 'user-2',
+				isRead: false,
+				media: [],
+			});
+			prisma.conversation.update.mockResolvedValue({});
+			prisma.message.count.mockResolvedValue(1);
+
+			const result = await service.sendMessage('user-2', 'conv-supp', {
+				content: 'Oi',
+			});
+
+			expect(result.otherUserId).toBe('staff-1');
+			expect(result.unreadCount).toBe(1);
+		});
+
+		it('reabre conversa SUPPORT RESOLVED ao receber nova mensagem', async () => {
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				status: 'RESOLVED',
+				assignedToId: 'staff-1',
+				participants: [{ userId: 'user-2' }, { userId: 'staff-1' }],
+			});
+			prisma.message.create.mockResolvedValue({
+				id: 'msg-reopen',
+				content: 'Ainda preciso de ajuda',
+				createdAt: new Date(),
+				senderId: 'user-2',
+				isRead: false,
+				media: [],
+			});
+			prisma.conversation.update.mockResolvedValue({});
+			prisma.message.count.mockResolvedValue(0);
+
+			await service.sendMessage('user-2', 'conv-supp', {
+				content: 'Ainda preciso de ajuda',
+			});
+
+			expect(prisma.conversation.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						status: 'IN_PROGRESS',
+					}),
+				}),
+			);
+		});
 	});
 
 	describe('markRead', () => {
@@ -639,6 +764,212 @@ describe('ChatsService', () => {
 						conversationId: 'conv-1',
 						isRead: false,
 						senderId: { not: 'user-1' },
+					}),
+				}),
+			);
+		});
+	});
+
+	describe('claimConversation', () => {
+		it('403 quando não é staff', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'USER' });
+
+			await expect(
+				service.claimConversation('user-1', 'conv-supp'),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('404 para conversa inexistente', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.findUnique.mockResolvedValue(null);
+
+			await expect(
+				service.claimConversation('staff-1', 'non-existent'),
+			).rejects.toThrow(NotFoundException);
+		});
+
+		it('400 quando a conversa não é SUPPORT', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-ad',
+				type: 'AD',
+				status: 'OPEN',
+				assignedToId: null,
+				participants: [],
+			});
+
+			await expect(
+				service.claimConversation('staff-1', 'conv-ad'),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('409 quando já atribuída a outro agente', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				status: 'IN_PROGRESS',
+				assignedToId: 'staff-2',
+				participants: [{ userId: 'user-1' }, { userId: 'staff-2' }],
+			});
+
+			await expect(
+				service.claimConversation('staff-1', 'conv-supp'),
+			).rejects.toThrow(ConflictException);
+		});
+
+		it('retorna como está quando já é o próprio agente atribuído', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				status: 'IN_PROGRESS',
+				assignedToId: 'staff-1',
+				participants: [{ userId: 'user-1' }],
+			});
+
+			const result = await service.claimConversation(
+				'staff-1',
+				'conv-supp',
+			);
+
+			expect(result.assignedToId).toBe('staff-1');
+			expect(prisma.conversation.update).not.toHaveBeenCalled();
+		});
+
+		it('atribui conversa, define IN_PROGRESS e adiciona staff como participante', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				status: 'OPEN',
+				assignedToId: null,
+				participants: [{ userId: 'user-1' }],
+			});
+			prisma.conversation.update.mockResolvedValue({
+				id: 'conv-supp',
+				status: 'IN_PROGRESS',
+				assignedToId: 'staff-1',
+			});
+
+			const result = await service.claimConversation(
+				'staff-1',
+				'conv-supp',
+			);
+
+			expect(result.status).toBe('IN_PROGRESS');
+			expect(prisma.conversation.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						status: 'IN_PROGRESS',
+						assignedToId: 'staff-1',
+						participants: expect.objectContaining({
+							create: expect.objectContaining({
+								userId: 'staff-1',
+							}),
+						}),
+					}),
+				}),
+			);
+		});
+	});
+
+	describe('releaseConversation', () => {
+		it('403 quando não é staff', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'USER' });
+
+			await expect(
+				service.releaseConversation('user-1', 'conv-supp'),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('403 quando não é o agente atribuído nem admin', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				assignedToId: 'staff-2',
+			});
+
+			await expect(
+				service.releaseConversation('staff-1', 'conv-supp'),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('libera a conversa para OPEN e remove o participante', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				assignedToId: 'staff-1',
+			});
+			prisma.conversation.update.mockResolvedValue({
+				id: 'conv-supp',
+				status: 'OPEN',
+				assignedToId: null,
+			});
+
+			const result = await service.releaseConversation(
+				'staff-1',
+				'conv-supp',
+			);
+
+			expect(result.status).toBe('OPEN');
+			expect(result.assignedToId).toBeNull();
+			expect(prisma.conversation.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						status: 'OPEN',
+						assignedToId: null,
+						participants: expect.objectContaining({
+							deleteMany: expect.objectContaining({
+								userId: 'staff-1',
+							}),
+						}),
+					}),
+				}),
+			);
+		});
+	});
+
+	describe('resolveConversation', () => {
+		it('403 quando não é o agente atribuído nem admin', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'MODERATOR' });
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				assignedToId: 'staff-2',
+			});
+
+			await expect(
+				service.resolveConversation('staff-1', 'conv-supp'),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('resolve a conversa definindo status RESOLVED', async () => {
+			prisma.user.findUnique.mockResolvedValue({ role: 'ADMIN' });
+			prisma.conversation.findUnique.mockResolvedValue({
+				id: 'conv-supp',
+				type: 'SUPPORT',
+				assignedToId: 'staff-2',
+			});
+			prisma.conversation.update.mockResolvedValue({
+				id: 'conv-supp',
+				status: 'RESOLVED',
+				assignedToId: null,
+			});
+
+			const result = await service.resolveConversation(
+				'admin-1',
+				'conv-supp',
+			);
+
+			expect(result.status).toBe('RESOLVED');
+			expect(prisma.conversation.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						status: 'RESOLVED',
+						assignedToId: null,
 					}),
 				}),
 			);

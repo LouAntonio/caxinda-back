@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ConflictException,
 	ForbiddenException,
 	Injectable,
 	NotFoundException,
@@ -48,6 +49,7 @@ const BUSINESS_SELECT = {
 const CONVERSATION_INCLUDE = {
 	ad: { select: AD_SELECT },
 	business: { select: BUSINESS_SELECT },
+	assignedTo: { select: USER_SELECT },
 	participants: {
 		include: { user: { select: USER_SELECT } },
 	},
@@ -78,7 +80,10 @@ const SUPPORT_AGENT: {
 export class ChatsService {
 	constructor(private readonly prisma: PrismaService) {}
 
-	async createConversation(userId: string, dto: CreateConversationDto) {
+	async createConversation(
+		userId: string,
+		dto: CreateConversationDto,
+	): Promise<{ id: string; created?: boolean }> {
 		const hasAd = Boolean(dto.adId);
 		const hasBusiness = Boolean(dto.businessId);
 		const isSupport = dto.type === 'SUPPORT';
@@ -224,20 +229,24 @@ export class ChatsService {
 		});
 	}
 
-	private async createSupportConversation(userId: string) {
+	private async createSupportConversation(userId: string): Promise<{
+		id: string;
+		created: boolean;
+	}> {
 		const existing = await this.prisma.conversation.findFirst({
 			where: {
 				type: 'SUPPORT',
+				status: { in: ['OPEN', 'IN_PROGRESS'] },
 				participants: { some: { userId } },
 			},
 			select: { id: true },
 		});
 
 		if (existing) {
-			return existing;
+			return { id: existing.id, created: false };
 		}
 
-		return this.prisma.conversation.create({
+		const conversation = await this.prisma.conversation.create({
 			data: {
 				id: newId(),
 				type: 'SUPPORT',
@@ -246,6 +255,146 @@ export class ChatsService {
 				},
 			},
 			select: { id: true },
+		});
+		return { id: conversation.id, created: true };
+	}
+
+	async claimConversation(userId: string, conversationId: string) {
+		await this.requireStaff(userId);
+		const conversation = await this.prisma.conversation.findUnique({
+			where: { id: conversationId },
+			select: {
+				id: true,
+				type: true,
+				status: true,
+				assignedToId: true,
+				participants: { select: { userId: true } },
+			},
+		});
+		if (!conversation) {
+			throw new NotFoundException('Conversa não encontrada.');
+		}
+		if (conversation.type !== 'SUPPORT') {
+			throw new BadRequestException(
+				'Apenas conversas de suporte podem ser atribuídas.',
+			);
+		}
+		if (conversation.status === 'CLOSED') {
+			throw new BadRequestException('Conversa encerrada.');
+		}
+		if (conversation.assignedToId && conversation.assignedToId !== userId) {
+			throw new ConflictException(
+				'Esta conversa já está atribuída a outro agente.',
+			);
+		}
+		if (conversation.assignedToId === userId) {
+			return {
+				id: conversation.id,
+				status: conversation.status,
+				assignedToId: userId,
+			};
+		}
+
+		return this.prisma.conversation.update({
+			where: { id: conversationId },
+			data: {
+				status: 'IN_PROGRESS',
+				assignedToId: userId,
+				...(conversation.participants.some((p) => p.userId === userId)
+					? {}
+					: {
+							participants: {
+								create: { id: newId(), userId },
+							},
+						}),
+			},
+			select: {
+				id: true,
+				status: true,
+				assignedToId: true,
+			},
+		});
+	}
+
+	async releaseConversation(userId: string, conversationId: string) {
+		await this.requireStaff(userId);
+		const conversation = await this.prisma.conversation.findUnique({
+			where: { id: conversationId },
+			select: {
+				id: true,
+				type: true,
+				assignedToId: true,
+			},
+		});
+		if (!conversation) {
+			throw new NotFoundException('Conversa não encontrada.');
+		}
+		if (conversation.type !== 'SUPPORT') {
+			throw new BadRequestException(
+				'Apenas conversas de suporte podem ser liberadas.',
+			);
+		}
+		if (
+			conversation.assignedToId !== userId &&
+			!(await this.isAdmin(userId))
+		) {
+			throw new ForbiddenException(
+				'Apenas o agente atribuído pode liberar esta conversa.',
+			);
+		}
+
+		return this.prisma.conversation.update({
+			where: { id: conversationId },
+			data: {
+				status: 'OPEN',
+				assignedToId: null,
+				participants: {
+					deleteMany: { userId },
+				},
+			},
+			select: {
+				id: true,
+				status: true,
+				assignedToId: true,
+			},
+		});
+	}
+
+	async resolveConversation(userId: string, conversationId: string) {
+		await this.requireStaff(userId);
+		const conversation = await this.prisma.conversation.findUnique({
+			where: { id: conversationId },
+			select: {
+				id: true,
+				type: true,
+				assignedToId: true,
+			},
+		});
+		if (!conversation) {
+			throw new NotFoundException('Conversa não encontrada.');
+		}
+		if (conversation.type !== 'SUPPORT') {
+			throw new BadRequestException(
+				'Apenas conversas de suporte podem ser resolvidas.',
+			);
+		}
+		if (
+			conversation.assignedToId !== userId &&
+			!(await this.isAdmin(userId))
+		) {
+			throw new ForbiddenException(
+				'Apenas o agente atribuído pode resolver esta conversa.',
+			);
+		}
+
+		return this.prisma.conversation.update({
+			where: { id: conversationId },
+			data: { status: 'RESOLVED', assignedToId: null },
+			select: {
+				id: true,
+				status: true,
+				assignedToId: true,
+			},
 		});
 	}
 
@@ -420,12 +569,18 @@ export class ChatsService {
 
 		const conversation = await this.prisma.conversation.findUnique({
 			where: { id: conversationId },
-			select: { participants: { select: { userId: true } } },
+			select: {
+				type: true,
+				status: true,
+				assignedToId: true,
+				participants: { select: { userId: true } },
+			},
 		});
 		if (!conversation) {
 			throw new NotFoundException('Conversa não encontrada.');
 		}
 
+		const isSupport = conversation.type === 'SUPPORT';
 		const [message] = await this.prisma.$transaction([
 			this.prisma.message.create({
 				data: {
@@ -439,13 +594,23 @@ export class ChatsService {
 			}),
 			this.prisma.conversation.update({
 				where: { id: conversationId },
-				data: { updatedAt: new Date() },
+				data: {
+					updatedAt: new Date(),
+					...(isSupport && conversation.status === 'RESOLVED'
+						? {
+								status: conversation.assignedToId
+									? 'IN_PROGRESS'
+									: 'OPEN',
+							}
+						: {}),
+				},
 			}),
 		]);
 
-		const otherUserId = conversation.participants.find(
-			(p) => p.userId !== userId,
-		)?.userId;
+		const otherUserId = isSupport
+			? (conversation.assignedToId ?? undefined)
+			: conversation.participants.find((p) => p.userId !== userId)
+					?.userId;
 
 		return {
 			message,
@@ -529,6 +694,22 @@ export class ChatsService {
 		return user?.role === 'ADMIN' || user?.role === 'MODERATOR';
 	}
 
+	private async isAdmin(userId: string): Promise<boolean> {
+		const user = await this.prisma.user.findUnique({
+			where: { id: userId },
+			select: { role: true },
+		});
+		return user?.role === 'ADMIN';
+	}
+
+	private async requireStaff(userId: string): Promise<void> {
+		if (!(await this.isStaff(userId))) {
+			throw new ForbiddenException(
+				'Apenas agentes de suporte podem executar esta ação.',
+			);
+		}
+	}
+
 	private toConversationView(
 		conversation: ConversationWithInclude,
 		viewerId: string,
@@ -549,6 +730,8 @@ export class ChatsService {
 		return {
 			id: conversation.id,
 			type: conversation.type,
+			status: conversation.status ?? 'OPEN',
+			assignedTo: conversation.assignedTo ?? null,
 			createdAt: conversation.createdAt,
 			updatedAt: conversation.updatedAt,
 			ad: conversation.ad

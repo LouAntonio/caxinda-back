@@ -8,14 +8,13 @@ import {
 	Post,
 	Query,
 	Req,
-	UseGuards,
 	UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { RequirePermission } from '../auth/decorators/roles.decorator';
 import {
 	BanUserDto,
@@ -49,7 +48,6 @@ export class UsersController {
 
 	@Get('me')
 	@ApiOperation({ summary: 'Obter o perfil do usuário logado' })
-	@UseGuards(PermissionsGuard)
 	async getMe(@Req() req: Request) {
 		const user = await this.requireUser(req);
 		return this.usersService.getMe(user.id);
@@ -57,7 +55,6 @@ export class UsersController {
 
 	@Patch('me')
 	@ApiOperation({ summary: 'Atualizar o perfil do usuário logado' })
-	@UseGuards(PermissionsGuard)
 	async updateMe(@Req() req: Request, @Body() dto: UpdateProfileDto) {
 		const user = await this.requireUser(req);
 		return this.usersService.updateMe(user.id, dto);
@@ -65,13 +62,13 @@ export class UsersController {
 
 	@Get()
 	@ApiOperation({ summary: 'Listar usuários (ADMIN/MODERATOR)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ user: ['list'] })
 	async list(@Req() req: Request, @Query() query: ListUsersQueryDto) {
 		return this.usersService.list(req.headers, query);
 	}
 
 	@Get('public/:id')
+	@Public()
 	@ApiOperation({ summary: 'Obter perfil público de um utilizador' })
 	async getPublicProfile(@Param('id') id: string) {
 		return this.usersService.getPublicProfile(id);
@@ -79,7 +76,6 @@ export class UsersController {
 
 	@Get(':id')
 	@ApiOperation({ summary: 'Obter detalhes de um usuário (ADMIN/MODERATOR)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ user: ['list'] })
 	async getById(@Param('id') id: string) {
 		return this.usersService.getById(id);
@@ -89,7 +85,6 @@ export class UsersController {
 	@ApiOperation({
 		summary: 'Criar usuário sem senha e enviar convite (ADMIN)',
 	})
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ user: ['create'] })
 	async create(@Req() req: Request, @Body() dto: CreateUserDto) {
 		return this.usersService.create(req.headers, dto);
@@ -97,7 +92,6 @@ export class UsersController {
 
 	@Post(':id/ban')
 	@ApiOperation({ summary: 'Banir usuário (ADMIN/MODERATOR)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ user: ['ban'] })
 	async ban(
 		@Req() req: Request,
@@ -111,7 +105,6 @@ export class UsersController {
 	@Post(':id/unban')
 	@ApiOperation({ summary: 'Desbanir usuário (ADMIN/MODERATOR)' })
 	@HttpCode(200)
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ user: ['ban'] })
 	async unban(@Req() req: Request, @Param('id') id: string) {
 		const user = await this.requireUser(req);
@@ -120,7 +113,6 @@ export class UsersController {
 
 	@Patch(':id/role')
 	@ApiOperation({ summary: 'Alterar o tipo de acesso (ADMIN/MODERATOR)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ user: ['set-role'] })
 	async setRole(
 		@Req() req: Request,

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { newId } from '../libs/id';
 import { AddWishlistDto, WishlistQueryDto } from './wishlist.dto';
 
@@ -71,8 +72,10 @@ export class WishlistService {
 	}
 
 	async list(userId: string, query: WishlistQueryDto) {
-		const page = query.page ?? 1;
-		const limit = query.limit ?? 20;
+		const { page, limit, skip, take } = buildPagination(
+			query.page,
+			query.limit,
+		);
 		const where: Prisma.WishlistItemWhereInput = { userId };
 
 		const [total, items] = await Promise.all([
@@ -80,22 +83,21 @@ export class WishlistService {
 			this.prisma.wishlistItem.findMany({
 				where,
 				orderBy: { createdAt: 'desc' },
-				skip: (page - 1) * limit,
-				take: limit,
+				skip,
+				take,
 				include: { ad: { select: AD_SELECT } },
 			}),
 		]);
 
-		return {
-			items: items.map((item) => ({
+		return paginate(
+			items.map((item) => ({
 				id: item.id,
 				createdAt: item.createdAt,
 				ad: this.toPublicAd(item.ad),
 			})),
 			total,
-			page,
-			limit,
-		};
+			{ page, limit },
+		);
 	}
 
 	async check(userId: string, adId: string) {

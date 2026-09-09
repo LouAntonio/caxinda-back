@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsUUID } from 'class-validator';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 export class AddWishlistDto {
 	@ApiProperty({ example: '00000000-0000-7000-8000-000000000001' })
@@ -8,19 +8,4 @@ export class AddWishlistDto {
 	adId: string;
 }
 
-export class WishlistQueryDto {
-	@ApiProperty({ default: 1 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	page?: number;
-
-	@ApiProperty({ default: 20 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	@Max(50)
-	limit?: number;
-}
+export class WishlistQueryDto extends PaginationQueryDto {}

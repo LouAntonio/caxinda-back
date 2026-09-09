@@ -9,7 +9,6 @@ import {
 	Post,
 	Query,
 	Req,
-	UseGuards,
 	BadRequestException,
 	UnauthorizedException,
 } from '@nestjs/common';
@@ -17,7 +16,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { RequirePermission } from '../auth/decorators/roles.decorator';
 import {
 	AdminListAdsQueryDto,
@@ -57,6 +56,7 @@ export class AdsController {
 	}
 
 	@Get()
+	@Public()
 	@ApiOperation({ summary: 'Listar anúncios (público)' })
 	async list(@Req() req: Request, @Query() query: AdQueryDto) {
 		const viewer = await this.sessionUser(req);
@@ -67,13 +67,13 @@ export class AdsController {
 	@ApiOperation({
 		summary: 'Listar anúncios para moderação (MODERATOR/ADMIN)',
 	})
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['moderate'] })
 	async adminList(@Query() query: AdminListAdsQueryDto) {
 		return this.adsService.adminList(query);
 	}
 
 	@Get('by-slug/:slug')
+	@Public()
 	@ApiOperation({ summary: 'Obter anúncio por slug (público)' })
 	async getBySlug(
 		@Req() req: Request,
@@ -86,6 +86,7 @@ export class AdsController {
 	}
 
 	@Get(':id')
+	@Public()
 	@ApiOperation({ summary: 'Obter anúncio por id (público)' })
 	async getById(
 		@Req() req: Request,
@@ -114,7 +115,6 @@ export class AdsController {
 	@ApiOperation({
 		summary: 'Criar anúncio (MODERATOR/ADMIN)',
 	})
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['create'] })
 	async create(@Req() req: Request, @Body() dto: CreateAdDto) {
 		const user = await this.requireUser(req);
@@ -123,7 +123,6 @@ export class AdsController {
 
 	@Patch(':id')
 	@ApiOperation({ summary: 'Editar anúncio (dono ou moderador)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['edit'] })
 	async update(
 		@Req() req: Request,
@@ -136,7 +135,6 @@ export class AdsController {
 
 	@Patch(':id/visibility')
 	@ApiOperation({ summary: 'Alternar visibilidade do anúncio (dono)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['edit'] })
 	async setVisibility(
 		@Req() req: Request,
@@ -149,7 +147,6 @@ export class AdsController {
 
 	@Post(':id/feature')
 	@ApiOperation({ summary: 'Destacar anúncio (dono, usando quota do plano)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['edit'] })
 	async feature(@Req() req: Request, @Param('id') id: string) {
 		const user = await this.requireUser(req);
@@ -158,7 +155,6 @@ export class AdsController {
 
 	@Delete(':id/feature')
 	@ApiOperation({ summary: 'Remover destaque (dono ou admin/moderador)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['edit'] })
 	async unfeature(@Req() req: Request, @Param('id') id: string) {
 		const user = await this.requireUser(req);
@@ -169,7 +165,6 @@ export class AdsController {
 	@ApiOperation({
 		summary: 'Moderar anúncio: verified + status (MODERATOR/ADMIN)',
 	})
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['moderate'] })
 	async moderate(@Param('id') id: string, @Body() dto: ModerateAdDto) {
 		return this.adsService.moderate(id, dto);
@@ -178,7 +173,6 @@ export class AdsController {
 	@Delete(':id')
 	@ApiOperation({ summary: 'Remover anúncio (dono ou ADMIN)' })
 	@HttpCode(204)
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ ad: ['delete'] })
 	async remove(@Req() req: Request, @Param('id') id: string) {
 		const user = await this.requireUser(req);

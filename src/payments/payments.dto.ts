@@ -1,18 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
 	IsIn,
-	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUUID,
 	IsUrl,
-	Max,
 	MaxLength,
-	Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { PaymentStatus } from '../generated/prisma/client';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 export class CreatePaymentDto {
 	@ApiProperty({
@@ -55,22 +52,7 @@ export class ReviewPaymentDto {
 	note?: string;
 }
 
-export class PaymentsQueryDto {
-	@ApiPropertyOptional({ default: 1 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	page?: number;
-
-	@ApiPropertyOptional({ default: 20 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	@Max(50)
-	limit?: number;
-
+export class PaymentsQueryDto extends PaginationQueryDto {
 	@ApiPropertyOptional({ enum: PaymentStatus })
 	@IsOptional()
 	@IsIn(Object.values(PaymentStatus), { message: 'status inválido' })

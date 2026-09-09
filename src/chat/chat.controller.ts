@@ -4,17 +4,17 @@ import {
 	Get,
 	HttpCode,
 	Param,
+	Patch,
 	Post,
 	Query,
 	Req,
-	UseGuards,
 	UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import {
 	ConversationsQueryDto,
 	CreateConversationDto,
@@ -22,14 +22,32 @@ import {
 	SendMessageDto,
 } from './chat.dto';
 import { ChatsService } from './chat.service';
+import { ChatsGateway } from './chat.gateway';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/roles';
 
+const chatThrottle = {
+	default: {
+		limit: Number(process.env.THROTTLE_CHAT_LIMIT ?? 120),
+		ttl: Number(process.env.THROTTLE_CHAT_TTL_MS ?? 60000),
+	},
+};
+
+const supportThrottle = {
+	default: {
+		limit: Number(process.env.THROTTLE_SUPPORT_LIMIT ?? 30),
+		ttl: Number(process.env.THROTTLE_SUPPORT_TTL_MS ?? 60000),
+	},
+};
+
 @Controller('conversations')
 @ApiTags('Chat')
-@UseGuards(PermissionsGuard)
+@Throttle(chatThrottle)
 export class ChatsController {
-	constructor(private readonly chatsService: ChatsService) {}
+	constructor(
+		private readonly chatsService: ChatsService,
+		private readonly chatsGateway: ChatsGateway,
+	) {}
 
 	private async requireUser(req: Request) {
 		const session = await auth.api.getSession({
@@ -51,7 +69,11 @@ export class ChatsController {
 		@Body() dto: CreateConversationDto,
 	) {
 		const userId = await this.requireUser(req);
-		return this.chatsService.createConversation(userId, dto);
+		const result = await this.chatsService.createConversation(userId, dto);
+		if (result.created && dto.type === 'SUPPORT') {
+			this.chatsGateway.notifyNewSupportConversation(result.id);
+		}
+		return result;
 	}
 
 	@Get()
@@ -106,5 +128,42 @@ export class ChatsController {
 	async markRead(@Req() req: Request, @Param('id') id: string) {
 		const userId = await this.requireUser(req);
 		return this.chatsService.markRead(userId, id);
+	}
+
+	@Post(':id/claim')
+	@Throttle(supportThrottle)
+	@ApiOperation({
+		summary:
+			'Atribuir a conversa de suporte ao agente logado (admin/moderador)',
+	})
+	@Roles(Role.ADMIN, Role.MODERATOR)
+	@HttpCode(200)
+	async claimConversation(@Req() req: Request, @Param('id') id: string) {
+		const userId = await this.requireUser(req);
+		return this.chatsService.claimConversation(userId, id);
+	}
+
+	@Post(':id/release')
+	@Throttle(supportThrottle)
+	@ApiOperation({
+		summary: 'Liberar a conversa de suporte (volta à fila OPEN)',
+	})
+	@Roles(Role.ADMIN, Role.MODERATOR)
+	@HttpCode(200)
+	async releaseConversation(@Req() req: Request, @Param('id') id: string) {
+		const userId = await this.requireUser(req);
+		return this.chatsService.releaseConversation(userId, id);
+	}
+
+	@Patch(':id/resolve')
+	@Throttle(supportThrottle)
+	@ApiOperation({
+		summary: 'Resolver a conversa de suporte (status RESOLVED)',
+	})
+	@Roles(Role.ADMIN, Role.MODERATOR)
+	@HttpCode(200)
+	async resolveConversation(@Req() req: Request, @Param('id') id: string) {
+		const userId = await this.requireUser(req);
+		return this.chatsService.resolveConversation(userId, id);
 	}
 }

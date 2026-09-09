@@ -4,6 +4,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { auth } from '../libs/auth';
 import { ChatsController } from './chat.controller';
 import { ChatsService } from './chat.service';
+import { ChatsGateway } from './chat.gateway';
 
 jest.mock('../libs/auth', () => ({
 	auth: {
@@ -28,6 +29,12 @@ describe('ChatsController', () => {
 		getMessages: jest.Mock;
 		sendMessage: jest.Mock;
 		markRead: jest.Mock;
+		claimConversation: jest.Mock;
+		releaseConversation: jest.Mock;
+		resolveConversation: jest.Mock;
+	};
+	let gateway: {
+		notifyNewSupportConversation: jest.Mock;
 	};
 
 	const sessionUser = {
@@ -49,12 +56,17 @@ describe('ChatsController', () => {
 			getMessages: jest.fn().mockResolvedValue({ items: [] }),
 			sendMessage: jest.fn().mockResolvedValue({}),
 			markRead: jest.fn().mockResolvedValue({}),
+			claimConversation: jest.fn().mockResolvedValue({}),
+			releaseConversation: jest.fn().mockResolvedValue({}),
+			resolveConversation: jest.fn().mockResolvedValue({}),
 		};
+		gateway = { notifyNewSupportConversation: jest.fn() };
 
 		const moduleRef = await Test.createTestingModule({
 			controllers: [ChatsController],
 			providers: [
 				{ provide: ChatsService, useValue: service },
+				{ provide: ChatsGateway, useValue: gateway },
 				PermissionsGuard,
 			],
 		}).compile();
@@ -132,5 +144,68 @@ describe('ChatsController', () => {
 		await controller.markRead(req, 'conv-1');
 
 		expect(service.markRead).toHaveBeenCalledWith('u1', 'conv-1');
+	});
+
+	it('cria conversa SUPPORT e notifica staff quando é nova', async () => {
+		const req = mockRequest();
+		service.createConversation.mockResolvedValue({
+			id: 'conv-supp',
+			created: true,
+		});
+
+		await controller.createConversation(req, {
+			type: 'SUPPORT' as const,
+		});
+
+		expect(service.createConversation).toHaveBeenCalledWith('u1', {
+			type: 'SUPPORT',
+		});
+		expect(gateway.notifyNewSupportConversation).toHaveBeenCalledWith(
+			'conv-supp',
+		);
+	});
+
+	it('não notifica staff quando a conversa SUPPORT é reutilizada', async () => {
+		const req = mockRequest();
+		service.createConversation.mockResolvedValue({
+			id: 'conv-supp',
+			created: false,
+		});
+
+		await controller.createConversation(req, {
+			type: 'SUPPORT' as const,
+		});
+
+		expect(gateway.notifyNewSupportConversation).not.toHaveBeenCalled();
+	});
+
+	it('claim repassa userId e id', async () => {
+		const req = mockRequest();
+
+		await controller.claimConversation(req, 'conv-1');
+
+		expect(service.claimConversation).toHaveBeenCalledWith('u1', 'conv-1');
+	});
+
+	it('release repassa userId e id', async () => {
+		const req = mockRequest();
+
+		await controller.releaseConversation(req, 'conv-1');
+
+		expect(service.releaseConversation).toHaveBeenCalledWith(
+			'u1',
+			'conv-1',
+		);
+	});
+
+	it('resolve repassa userId e id', async () => {
+		const req = mockRequest();
+
+		await controller.resolveConversation(req, 'conv-1');
+
+		expect(service.resolveConversation).toHaveBeenCalledWith(
+			'u1',
+			'conv-1',
+		);
 	});
 });

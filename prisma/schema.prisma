@@ -51,6 +51,13 @@ enum ConversationType {
   SUPPORT
 }
 
+enum ConversationStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
 enum Province {
   BENGO
   BENGUELA
@@ -134,18 +141,19 @@ model User {
   isVerified Boolean @default(false)
 
   // Relações
-  sessions        Session[]
-  accounts        Account[]
-  ads             Ad[]
-  businesses      Business[]
-  sentReviews     Review[]                  @relation("Reviewer")
-  receivedReviews Review[]                  @relation("Reviewee")
-  conversations   ConversationParticipant[]
-  messages        Message[]
-  kyc             KYC?
-  reports         Report[]
-  wishlist        WishlistItem[]
-  subscriptions   Subscription[]
+  sessions              Session[]
+  accounts              Account[]
+  ads                   Ad[]
+  businesses            Business[]
+  sentReviews           Review[]                  @relation("Reviewer")
+  receivedReviews       Review[]                  @relation("Reviewee")
+  conversations         ConversationParticipant[]
+  messages              Message[]
+  assignedConversations Conversation[]            @relation("AssignedConversations")
+  kyc                   KYC?
+  reports               Report[]
+  wishlist              WishlistItem[]
+  subscriptions         Subscription[]
 
   @@map("user")
 }
@@ -402,19 +410,24 @@ model AnalyticsDaily {
 }
 
 model Conversation {
-  id         String           @id @db.Uuid
-  type       ConversationType @default(AD)
-  adId       String?          @db.Uuid
-  businessId String?          @db.Uuid
-  ad         Ad?              @relation(fields: [adId], references: [id])
-  business   Business?        @relation(fields: [businessId], references: [id])
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  id           String             @id @db.Uuid
+  type         ConversationType   @default(AD)
+  status       ConversationStatus @default(OPEN)
+  adId         String?            @db.Uuid
+  businessId   String?            @db.Uuid
+  assignedToId String?            @db.Uuid
+  ad           Ad?                @relation(fields: [adId], references: [id])
+  business     Business?          @relation(fields: [businessId], references: [id])
+  assignedTo   User?              @relation("AssignedConversations", fields: [assignedToId], references: [id])
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   participants ConversationParticipant[]
   messages     Message[]
 
   @@index([type])
+  @@index([status])
+  @@index([assignedToId])
   @@index([adId])
   @@index([businessId])
   @@map("conversation")

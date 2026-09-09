@@ -6,20 +6,18 @@ import {
 	IsEmail,
 	IsEnum,
 	IsIn,
-	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUrl,
 	IsUUID,
 	Matches,
-	Max,
 	MaxLength,
-	Min,
 	ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { BusinessStatus, Province } from '../generated/prisma/client';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -252,22 +250,7 @@ export class ModerateBusinessDto {
 	status?: BusinessStatus;
 }
 
-export class BusinessesQueryDto {
-	@ApiPropertyOptional({ default: 1 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	page?: number;
-
-	@ApiPropertyOptional({ default: 20 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	@Max(50)
-	limit?: number;
-
+export class BusinessesQueryDto extends PaginationQueryDto {
 	@ApiPropertyOptional({ enum: BUSINESS_SORTS, default: 'newest' })
 	@IsOptional()
 	@IsIn(BUSINESS_SORTS, { message: 'sortBy inválido' })

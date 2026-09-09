@@ -21,16 +21,18 @@ import {
 } from './auth.dto';
 import { MagicLinkService } from './magic-link.service';
 import { translateAuthError } from '../libs/http-exceptions';
+import { Public } from './decorators/public.decorator';
 
 const handler = toNodeHandler(auth);
 
 const authThrottle = {
-	auth: {
+	default: {
 		limit: Number(process.env.THROTTLE_AUTH_LIMIT ?? 10),
 		ttl: Number(process.env.THROTTLE_AUTH_TTL_MS ?? 60000),
 	},
 };
 
+@Public()
 @Controller('auth')
 @ApiTags('Auth')
 @Throttle(authThrottle)

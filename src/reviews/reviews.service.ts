@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { newId } from '../libs/id';
 import {
 	CreateReviewDto,
@@ -156,8 +157,10 @@ export class ReviewsService {
 	}
 
 	async list(query: ReviewsQueryDto) {
-		const page = query.page ?? 1;
-		const limit = query.limit ?? 20;
+		const { page, limit, skip, take } = buildPagination(
+			query.page,
+			query.limit,
+		);
 		const where: Prisma.ReviewWhereInput = {
 			...(query.adId && { adId: query.adId }),
 			...(query.businessId && { businessId: query.businessId }),
@@ -169,18 +172,17 @@ export class ReviewsService {
 			this.prisma.review.findMany({
 				where,
 				orderBy: { createdAt: 'desc' },
-				skip: (page - 1) * limit,
-				take: limit,
+				skip,
+				take,
 				include: REVIEW_INCLUDE,
 			}),
 		]);
 
-		return {
-			items: reviews.map((review) => this.toPublicReview(review)),
+		return paginate(
+			reviews.map((review) => this.toPublicReview(review)),
 			total,
-			page,
-			limit,
-		};
+			{ page, limit },
+		);
 	}
 
 	async respond(

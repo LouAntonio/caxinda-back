@@ -125,6 +125,41 @@ describe('ChatsGateway', () => {
 			expect(socket.join).toHaveBeenCalledWith('user:user-auth');
 			expect(server.to).toHaveBeenCalledWith('user:user-auth');
 		});
+
+		it('staff entra na staff room', async () => {
+			mockedAuth.api.getSession.mockResolvedValue({
+				user: { id: 'admin-1', role: 'ADMIN' },
+			});
+			const socket = createMockSocket();
+
+			await gateway.handleConnection(socket as never);
+
+			expect(socket.join).toHaveBeenCalledWith('staff');
+		});
+
+		it('utilizador normal não entra na staff room', async () => {
+			mockedAuth.api.getSession.mockResolvedValue({
+				user: { id: 'user-1', role: 'USER' },
+			});
+			const socket = createMockSocket();
+
+			await gateway.handleConnection(socket as never);
+
+			expect(socket.join).not.toHaveBeenCalledWith('staff');
+		});
+	});
+
+	describe('notifyNewSupportConversation', () => {
+		it('emite conversation:new-support para a sala staff', () => {
+			gateway.notifyNewSupportConversation('conv-supp');
+
+			expect(server.to).toHaveBeenCalledWith('staff');
+			const emission = server.to.mock.results[0].value;
+			expect(emission.emit).toHaveBeenCalledWith(
+				'conversation:new-support',
+				{ conversationId: 'conv-supp' },
+			);
+		});
 	});
 
 	describe('conversation:join', () => {

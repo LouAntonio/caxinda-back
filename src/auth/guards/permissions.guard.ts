@@ -9,6 +9,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../../libs/auth';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import {
 	REQUIRED_PERMISSIONS_KEY,
 	REQUIRED_ROLES_KEY,
@@ -21,6 +22,14 @@ export class PermissionsGuard implements CanActivate {
 	constructor(private readonly reflector: Reflector) {}
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
+		const isPublic = this.reflector.getAllAndOverride<boolean>(
+			IS_PUBLIC_KEY,
+			[context.getHandler(), context.getClass()],
+		);
+		if (isPublic) {
+			return true;
+		}
+
 		const requiredRoles = this.reflector.getAllAndOverride<Role[]>(
 			REQUIRED_ROLES_KEY,
 			[context.getHandler(), context.getClass()],

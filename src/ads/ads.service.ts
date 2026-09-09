@@ -7,9 +7,15 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
+import {
+	buildPagination,
+	paginate,
+	type PaginatedResult,
+} from '../common/dto/paginated-result.dto';
 import { CacheService } from '../cache/cache.service';
 import { MediaService } from '../media/media.service';
 import { newId } from '../libs/id';
+import { buildSearchOR } from '../common/helpers/search.helper';
 import {
 	AdminListAdsQueryDto,
 	AdQueryDto,
@@ -98,8 +104,10 @@ export class AdsService {
 	async list(query: AdQueryDto = {}, viewer?: AdSessionUser | null) {
 		await this.expireStaleFeatured();
 
-		const page = query.page ?? 1;
-		const limit = query.limit ?? 20;
+		const { page, limit, skip, take } = buildPagination(
+			query.page,
+			query.limit,
+		);
 		const sortBy = query.sortBy ?? 'newest';
 		const includeInactive = !!(
 			query.includeInactive &&
@@ -160,10 +168,7 @@ export class AdsService {
 		}
 
 		if (query.q) {
-			where.OR = [
-				{ title: { contains: query.q, mode: 'insensitive' } },
-				{ description: { contains: query.q, mode: 'insensitive' } },
-			];
+			where.OR = buildSearchOR(['title', 'description'], query.q);
 		}
 
 		if (query.minPrice !== undefined || query.maxPrice !== undefined) {
@@ -207,7 +212,7 @@ export class AdsService {
 					(distanceMap.get(b.id) ?? Number.MAX_SAFE_INTEGER),
 			);
 
-			const paged = withinRadius.slice((page - 1) * limit, page * limit);
+			const paged = withinRadius.slice(skip, skip + take);
 			items = paged.map((ad) =>
 				this.toPublicAd(ad, distanceMap.get(ad.id)),
 			);
@@ -216,29 +221,26 @@ export class AdsService {
 				where,
 				include: AD_INCLUDE,
 				orderBy,
-				skip: (page - 1) * limit,
-				take: limit,
+				skip,
+				take,
 			});
 			items = ads.map((ad) => this.toPublicAd(ad));
 		}
 
 		return {
-			items,
-			total,
-			page,
-			limit,
+			...paginate(items, total, { page, limit }),
 			proximity: proximity ? true : undefined,
 		};
 	}
 
-	async adminList(query: AdminListAdsQueryDto = {}): Promise<{
-		items: AdDetail[];
-		total: number;
-		page: number;
-		limit: number;
-	}> {
-		const page = query.page ?? 1;
-		const limit = query.limit ?? 20;
+	async adminList(
+		query: AdminListAdsQueryDto = {},
+	): Promise<PaginatedResult<AdDetail>> {
+		const { page, limit, skip, take } = buildPagination(
+			query.page,
+			query.limit,
+			AdminListAdsQueryDto.LIMIT_MAX,
+		);
 
 		const where: Prisma.AdWhereInput = {};
 		if (query.status) {
@@ -248,50 +250,33 @@ export class AdsService {
 			where.visibility = query.visibility;
 		}
 		if (query.q) {
-			where.OR = [
-				{ title: { contains: query.q, mode: 'insensitive' } },
-				{ description: { contains: query.q, mode: 'insensitive' } },
-			];
+			where.OR = buildSearchOR(['title', 'description'], query.q);
 		}
 		if (query.sellerName) {
 			where.user = {
-				OR: [
-					{
-						name: {
-							contains: query.sellerName,
-							mode: 'insensitive',
-						},
-					},
-					{
-						surname: {
-							contains: query.sellerName,
-							mode: 'insensitive',
-						},
-					},
-				],
+				OR: buildSearchOR(['name', 'surname'], query.sellerName),
 			};
 		}
 
-		const [items, total] = await Promise.all([
+		const [found, total] = await Promise.all([
 			this.prisma.ad.findMany({
 				where,
 				include: AD_INCLUDE,
 				orderBy: { createdAt: 'desc' },
-				skip: (page - 1) * limit,
-				take: limit,
+				skip,
+				take,
 			}),
 			this.prisma.ad.count({ where }),
 		]);
 
-		return {
-			items: items.map((ad) => ({
+		return paginate(
+			found.map((ad) => ({
 				...this.toPublicAd(ad),
 				user: ad.user,
 			})) as unknown as AdDetail[],
 			total,
-			page,
-			limit,
-		};
+			{ page, limit },
+		);
 	}
 
 	private buildOrderBy(sortBy: string): Prisma.AdOrderByWithRelationInput[] {

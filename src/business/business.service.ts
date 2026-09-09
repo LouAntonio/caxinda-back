@@ -7,9 +7,11 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { PaymentsService } from '../payments/payments.service';
 import { newId } from '../libs/id';
+import { buildSearchOR } from '../common/helpers/search.helper';
 import { slugify } from '../categories/categories.service';
 import {
 	BusinessesQueryDto,
@@ -67,8 +69,10 @@ export class BusinessesService {
 
 	async listPublic(query: BusinessesQueryDto, viewer?: BusinessSessionUser) {
 		await this.paymentsService.expireStaleSubscriptions();
-		const page = query.page ?? 1;
-		const limit = query.limit ?? 20;
+		const { page, limit, skip, take } = buildPagination(
+			query.page,
+			query.limit,
+		);
 		const privileged = this.isPrivileged(viewer);
 
 		const where: Prisma.BusinessWhereInput = {
@@ -76,11 +80,7 @@ export class BusinessesService {
 			...(query.province && { province: query.province }),
 			...(query.categoryId && { categoryId: query.categoryId }),
 			...(query.q && {
-				OR: [
-					{ name: { contains: query.q, mode: 'insensitive' } },
-					{ description: { contains: query.q, mode: 'insensitive' } },
-					{ phone: { contains: query.q, mode: 'insensitive' } },
-				],
+				OR: buildSearchOR(['name', 'description', 'phone'], query.q),
 			}),
 		};
 
@@ -89,18 +89,16 @@ export class BusinessesService {
 			this.prisma.business.findMany({
 				where,
 				orderBy: this.orderBy(query.sortBy),
-				skip: (page - 1) * limit,
-				take: limit,
+				skip,
+				take,
 				include: BUSINESS_INCLUDE,
 			}),
 		]);
 
-		return {
-			items: await this.toPublicBusinesses(businesses),
-			total,
+		return paginate(await this.toPublicBusinesses(businesses), total, {
 			page,
 			limit,
-		};
+		});
 	}
 
 	async getBySlug(slug: string, viewer?: BusinessSessionUser) {

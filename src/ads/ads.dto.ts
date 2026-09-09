@@ -5,7 +5,6 @@ import {
 	IsArray,
 	IsBoolean,
 	IsIn,
-	IsInt,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -19,6 +18,7 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -234,22 +234,7 @@ export class ModerateAdDto {
 	status?: (typeof AD_STATUSES)[number];
 }
 
-export class AdQueryDto {
-	@ApiPropertyOptional({ default: 1 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	page?: number;
-
-	@ApiPropertyOptional({ default: 20 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	@Max(50)
-	limit?: number;
-
+export class AdQueryDto extends PaginationQueryDto {
 	@ApiPropertyOptional({ enum: AD_SORTS, default: 'newest' })
 	@IsOptional()
 	@IsIn(AD_SORTS, { message: 'sortBy inválido' })
@@ -362,21 +347,8 @@ export class AdProximityQueryDto {
 	lng?: number;
 }
 
-export class AdminListAdsQueryDto {
-	@ApiPropertyOptional({ default: 1 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	page?: number;
-
-	@ApiPropertyOptional({ default: 20 })
-	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	@Max(100)
-	limit?: number;
+export class AdminListAdsQueryDto extends PaginationQueryDto {
+	static readonly LIMIT_MAX = 100;
 
 	@ApiPropertyOptional({ enum: AD_STATUSES })
 	@IsOptional()

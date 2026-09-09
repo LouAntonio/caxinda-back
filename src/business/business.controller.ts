@@ -10,13 +10,12 @@ import {
 	Query,
 	Req,
 	UnauthorizedException,
-	UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { RequirePermission } from '../auth/decorators/roles.decorator';
 import {
 	BusinessesQueryDto,
@@ -56,6 +55,7 @@ export class BusinessesController {
 	}
 
 	@Get()
+	@Public()
 	@ApiOperation({ summary: 'Listar empresas (público)' })
 	async list(@Req() req: Request, @Query() query: BusinessesQueryDto) {
 		const viewer = await this.sessionUser(req);
@@ -63,6 +63,7 @@ export class BusinessesController {
 	}
 
 	@Get('by-slug/:slug')
+	@Public()
 	@ApiOperation({ summary: 'Obter empresa por slug (público)' })
 	async getBySlug(@Req() req: Request, @Param('slug') slug: string) {
 		const viewer = await this.sessionUser(req);
@@ -70,6 +71,7 @@ export class BusinessesController {
 	}
 
 	@Get(':id')
+	@Public()
 	@ApiOperation({ summary: 'Obter empresa por id (público)' })
 	async getById(@Req() req: Request, @Param('id') id: string) {
 		const viewer = await this.sessionUser(req);
@@ -78,7 +80,6 @@ export class BusinessesController {
 
 	@Post()
 	@ApiOperation({ summary: 'Criar empresa (PROMOTER/MODERATOR/ADMIN)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ business: ['create'] })
 	async create(@Req() req: Request, @Body() dto: CreateBusinessDto) {
 		const user = await this.requireUser(req);
@@ -87,7 +88,6 @@ export class BusinessesController {
 
 	@Patch(':id')
 	@ApiOperation({ summary: 'Editar empresa (dono ou moderador)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ business: ['edit'] })
 	async update(
 		@Req() req: Request,
@@ -100,7 +100,6 @@ export class BusinessesController {
 
 	@Patch(':id/status')
 	@ApiOperation({ summary: 'Alternar estado de exibição (dono)' })
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ business: ['edit'] })
 	async setStatus(
 		@Req() req: Request,
@@ -115,7 +114,6 @@ export class BusinessesController {
 	@ApiOperation({
 		summary: 'Moderar empresa: isVerified + status (MODERATOR/ADMIN)',
 	})
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ business: ['moderate'] })
 	async moderate(@Param('id') id: string, @Body() dto: ModerateBusinessDto) {
 		return this.businessesService.moderate(id, dto);
@@ -124,7 +122,6 @@ export class BusinessesController {
 	@Delete(':id')
 	@ApiOperation({ summary: 'Remover empresa (dono ou ADMIN)' })
 	@HttpCode(204)
-	@UseGuards(PermissionsGuard)
 	@RequirePermission({ business: ['delete'] })
 	async remove(@Req() req: Request, @Param('id') id: string) {
 		const user = await this.requireUser(req);

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { newId } from '../libs/id';
 import {
 	CreateReportDto,
@@ -79,8 +80,10 @@ export class ReportsService {
 			);
 		}
 
-		const page = query.page ?? 1;
-		const limit = query.limit ?? 20;
+		const { page, limit, skip, take } = buildPagination(
+			query.page,
+			query.limit,
+		);
 		const where: Prisma.ReportWhereInput = {
 			...(query.status && { status: query.status }),
 			...(query.targetType && { targetType: query.targetType }),
@@ -92,25 +95,26 @@ export class ReportsService {
 			this.prisma.report.findMany({
 				where,
 				orderBy: { createdAt: 'desc' },
-				skip: (page - 1) * limit,
-				take: limit,
+				skip,
+				take,
 				include: REPORT_INCLUDE,
 			}),
 		]);
 
-		return {
-			items: await Promise.all(
+		return paginate(
+			await Promise.all(
 				reports.map((report) => this.toPublicReport(report)),
 			),
 			total,
-			page,
-			limit,
-		};
+			{ page, limit },
+		);
 	}
 
 	async listMine(reporterId: string, query: ReportsQueryDto) {
-		const page = query.page ?? 1;
-		const limit = query.limit ?? 20;
+		const { page, limit, skip, take } = buildPagination(
+			query.page,
+			query.limit,
+		);
 		const where: Prisma.ReportWhereInput = {
 			reporterId,
 			...(query.status && { status: query.status }),
@@ -121,20 +125,19 @@ export class ReportsService {
 			this.prisma.report.findMany({
 				where,
 				orderBy: { createdAt: 'desc' },
-				skip: (page - 1) * limit,
-				take: limit,
+				skip,
+				take,
 				include: REPORT_INCLUDE,
 			}),
 		]);
 
-		return {
-			items: await Promise.all(
+		return paginate(
+			await Promise.all(
 				reports.map((report) => this.toPublicReport(report)),
 			),
 			total,
-			page,
-			limit,
-		};
+			{ page, limit },
+		);
 	}
 
 	async updateStatus(

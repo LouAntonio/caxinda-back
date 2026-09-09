@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
+import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { newId } from '../libs/id';
 import {
 	CreatePaymentDto,
@@ -302,10 +303,12 @@ export class PaymentsService {
 		return fresh ? this.toPublicPayment(fresh) : null;
 	}
 
-	async list(query: PaymentsQueryDto): Promise<unknown> {
+	async list(query: PaymentsQueryDto) {
 		await this.expireStaleSubscriptions();
-		const page = query.page ?? 1;
-		const limit = query.limit ?? 20;
+		const { page, limit, skip, take } = buildPagination(
+			query.page,
+			query.limit,
+		);
 		const where: Prisma.PaymentWhereInput = {
 			...(query.status && { status: query.status }),
 		};
@@ -315,18 +318,17 @@ export class PaymentsService {
 			this.prisma.payment.findMany({
 				where,
 				orderBy: { createdAt: 'desc' },
-				skip: (page - 1) * limit,
-				take: limit,
+				skip,
+				take,
 				include: PAYMENT_INCLUDE,
 			}),
 		]);
 
-		return {
-			items: payments.map((payment) => this.toPublicPayment(payment)),
+		return paginate(
+			payments.map((payment) => this.toPublicPayment(payment)),
 			total,
-			page,
-			limit,
-		};
+			{ page, limit },
+		);
 	}
 
 	async getById(
