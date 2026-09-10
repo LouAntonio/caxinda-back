@@ -220,6 +220,13 @@ export class AuthController {
 			}
 			send(body);
 		}) as typeof res.json;
-		await handler(req, res);
+		try {
+			await handler(req, res);
+		} catch (error) {
+			console.error('[auth-proxy] Unhandled error:', error);
+			if (!res.headersSent) {
+				res.status(500).send('Internal Server Error');
+			}
+		}
 	}
 }

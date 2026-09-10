@@ -3,6 +3,7 @@ import { HttpException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthController } from './auth.controller';
 import { MagicLinkService } from './magic-link.service';
+import { GoogleAuthService } from './services/google-auth.service';
 
 jest.mock('../libs/auth', () => ({
 	auth: {
@@ -58,6 +59,10 @@ describe('AuthController', () => {
 				{
 					provide: MagicLinkService,
 					useValue: magicLinkService,
+				},
+				{
+					provide: GoogleAuthService,
+					useValue: { authenticate: jest.fn() },
 				},
 			],
 		}).compile();

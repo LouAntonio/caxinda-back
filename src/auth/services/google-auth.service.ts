@@ -102,8 +102,8 @@ export class GoogleAuthService {
 	private async linkAccount(profile: GoogleAuthProfile) {
 		const existing = await prisma.account.findUnique({
 			where: {
-				issuer_accountId: {
-					issuer: GOOGLE_ISSUER,
+				providerId_accountId: {
+					providerId: GOOGLE_PROVIDER,
 					accountId: profile.id,
 				},
 			},
