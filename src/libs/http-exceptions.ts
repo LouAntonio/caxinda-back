@@ -49,3 +49,81 @@ export function translateAuthError(message: string): string {
 	}
 	return AUTH_ERRORS_PT[message] ?? 'Não foi possível concluir a operação.';
 }
+
+const FIRST_WORD = /^([^\s]+)/;
+
+function fieldName(message: string): string {
+	return message.match(FIRST_WORD)?.[1] ?? 'valor';
+}
+
+/**
+ * Traduz mensagens de validação do class-validator (ValidationPipe) para
+ * português. Mensagens que já contêm acentos são devolvidas como estão.
+ */
+export function translateValidationError(message: string): string {
+	if (HAS_ACCENTED_CHARS.test(message)) {
+		return message;
+	}
+
+	const field = fieldName(message);
+
+	if (/^property .* should not exist$/.test(message)) {
+		const prop = message.replace(/^property (.+?) should not exist$/, '$1');
+		return `O campo "${prop}" não é permitido.`;
+	}
+	if (/ should not be empty$/.test(message)) {
+		return `O campo "${field}" não pode estar vazio.`;
+	}
+	if (/ must be an email$/.test(message)) {
+		return `O campo "${field}" deve ser um email válido.`;
+	}
+	if (/ must be an url$/.test(message)) {
+		return `O campo "${field}" deve ser um URL válido.`;
+	}
+	if (/ must be a string$/.test(message)) {
+		return `O campo "${field}" deve ser uma string.`;
+	}
+	if (/ must be a number$/.test(message)) {
+		return `O campo "${field}" deve ser um número.`;
+	}
+	if (/ must be an integer$/.test(message)) {
+		return `O campo "${field}" deve ser um número inteiro.`;
+	}
+	if (/ must be a boolean$/.test(message)) {
+		return `O campo "${field}" deve ser verdadeiro ou falso.`;
+	}
+	if (/ must be an UUID$/.test(message)) {
+		return 'Identificador inválido.';
+	}
+	if (/ must be longer than or equal to (\d+) characters$/.test(message)) {
+		const length = message.match(
+			/ must be longer than or equal to (\d+) characters$/,
+		)?.[1];
+		return `O campo "${field}" deve ter pelo menos ${length} caracteres.`;
+	}
+	if (/ must be shorter than or equal to (\d+) characters$/.test(message)) {
+		const length = message.match(
+			/ must be shorter than or equal to (\d+) characters$/,
+		)?.[1];
+		return `O campo "${field}" deve ter no máximo ${length} caracteres.`;
+	}
+	if (/ must be exactly (\d+) characters$/.test(message)) {
+		const length = message.match(/ must be exactly (\d+) characters$/)?.[1];
+		return `O campo "${field}" deve ter exatamente ${length} caracteres.`;
+	}
+	if (/ must be one of the following values: (.+)$/.test(message)) {
+		const values = message.replace(
+			/^.* must be one of the following values: (.+)$/,
+			'$1',
+		);
+		return `O campo "${field}" deve ser um dos seguintes valores: ${values}.`;
+	}
+	if (/ must be a valid enum value$/.test(message)) {
+		return `Valor inválido para o campo "${field}".`;
+	}
+	if (/ must match .+ regular expression$/.test(message)) {
+		return `Formato inválido para o campo "${field}".`;
+	}
+
+	return `Valor inválido para o campo "${field}".`;
+}

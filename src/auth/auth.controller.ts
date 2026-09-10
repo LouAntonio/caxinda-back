@@ -123,6 +123,26 @@ export class AuthController {
 		}
 	}
 
+	@Post('link-google')
+	@HttpCode(200)
+	@ApiOperation({
+		summary: 'Vincular a conta Google ao utilizador autenticado',
+	})
+	async linkGoogle(@Body() body: GoogleSignInDto, @Req() req: Request) {
+		const session = await this.getSessionOrThrow(req);
+		try {
+			const profile = await this.googleAuthService.verifyCredential(
+				body.credential,
+			);
+			return await this.googleAuthService.linkToUser(
+				session.user.id,
+				profile,
+			);
+		} catch (error) {
+			throw this.toHttpError(error);
+		}
+	}
+
 	@Post('set-password')
 	@HttpCode(200)
 	@ApiOperation({ summary: 'Definir senha (contas criadas via Google)' })

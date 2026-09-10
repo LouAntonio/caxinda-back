@@ -111,12 +111,20 @@ export const auth = betterAuth({
 	emailVerification: {
 		sendOnSignIn: true,
 		sendVerificationEmail: async ({ user, url }) => {
+			const token =
+				url.split('/verify-email?')[1]?.split('&')[0]?.split('=')[1] ??
+				url;
+			const verifyUrl = token
+				? frontUrl(
+						`/auth/verificar?tipo=email&token=${encodeURIComponent(token)}`,
+					)
+				: url;
 			await sendMailBridge({
 				to: user.email,
 				subject: 'Verifique seu email',
 				html: `<p>Olá ${user.name},</p>
 					<p>Clique no link abaixo para verificar seu email:</p>
-					<p><a href="${url}">Verificar email</a></p>`,
+					<p><a href="${verifyUrl}">Verificar email</a></p>`,
 			});
 		},
 	},

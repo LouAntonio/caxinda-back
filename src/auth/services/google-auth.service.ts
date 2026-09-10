@@ -43,7 +43,7 @@ export class GoogleAuthService {
 	}
 
 	async authenticate(credential: string): Promise<GoogleAuthResult> {
-		const profile = await this.verify(credential);
+		const profile = await this.verifyCredential(credential);
 		const user = await this.linkAccount(profile);
 
 		const ctx = await auth.$context;
@@ -63,6 +63,54 @@ export class GoogleAuthService {
 				role: user.role,
 			},
 		};
+	}
+
+	/**
+	 * Valida o ID token do Google (sem criar sessão) e devolve o perfil.
+	 * Usado pelo fluxo de "vincular Google" de um utilizador já autenticado.
+	 */
+	async verifyCredential(credential: string): Promise<GoogleAuthProfile> {
+		return this.verify(credential);
+	}
+
+	/**
+	 * Associa a conta Google ao utilizador autenticado. Falha se a conta
+	 * Google já estiver associada a outro utilizador.
+	 */
+	async linkToUser(
+		userId: string,
+		profile: GoogleAuthProfile,
+	): Promise<{ linked: true; alreadyLinked?: boolean }> {
+		const existing = await prisma.account.findUnique({
+			where: {
+				providerId_accountId: {
+					providerId: GOOGLE_PROVIDER,
+					accountId: profile.id,
+				},
+			},
+		});
+
+		if (existing) {
+			if (existing.userId === userId) {
+				return { linked: true, alreadyLinked: true };
+			}
+			throw new UnauthorizedException(
+				'Esta conta Google já está associada a outro utilizador.',
+			);
+		}
+
+		await prisma.account.create({
+			data: {
+				id: newId(),
+				issuer: GOOGLE_ISSUER,
+				accountId: profile.id,
+				providerId: GOOGLE_PROVIDER,
+				userId,
+			},
+			select: { id: true },
+		});
+
+		return { linked: true };
 	}
 
 	private async verify(credential: string): Promise<GoogleAuthProfile> {

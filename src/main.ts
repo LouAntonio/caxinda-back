@@ -1,11 +1,17 @@
 import './common/env';
-import { LoggerService, RequestMethod, ValidationPipe } from '@nestjs/common';
+import {
+	BadRequestException,
+	LoggerService,
+	RequestMethod,
+	ValidationPipe,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { AppModule } from './app.module';
 import { auth } from './libs/auth';
+import { translateValidationError } from './libs/http-exceptions';
 
 type BetterAuthPath = Record<string, Record<string, unknown> | undefined>;
 
@@ -25,6 +31,14 @@ async function bootstrap() {
 			whitelist: true,
 			transform: true,
 			forbidNonWhitelisted: true,
+			exceptionFactory: (errors) => {
+				const messages = errors.flatMap((error) =>
+					Object.values(error.constraints ?? {}).map(
+						translateValidationError,
+					),
+				);
+				return new BadRequestException(Array.from(new Set(messages)));
+			},
 		}),
 	);
 

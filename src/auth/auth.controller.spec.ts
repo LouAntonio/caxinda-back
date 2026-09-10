@@ -45,6 +45,11 @@ const mockedPrisma = prisma as unknown as { account: { findMany: jest.Mock } };
 describe('AuthController', () => {
 	let controller: AuthController;
 	let magicLinkService: { request: jest.Mock; verify: jest.Mock };
+	let googleAuthService: {
+		authenticate: jest.Mock;
+		verifyCredential: jest.Mock;
+		linkToUser: jest.Mock;
+	};
 
 	beforeEach(async () => {
 		jest.clearAllMocks();
@@ -62,12 +67,21 @@ describe('AuthController', () => {
 				},
 				{
 					provide: GoogleAuthService,
-					useValue: { authenticate: jest.fn() },
+					useValue: {
+						authenticate: jest.fn(),
+						verifyCredential: jest.fn(),
+						linkToUser: jest.fn(),
+					},
 				},
 			],
 		}).compile();
 
 		controller = moduleRef.get<AuthController>(AuthController);
+		googleAuthService = moduleRef.get<{
+			authenticate: jest.Mock;
+			verifyCredential: jest.Mock;
+			linkToUser: jest.Mock;
+		}>(GoogleAuthService);
 	});
 
 	describe('magicLinkRequest', () => {
@@ -133,6 +147,66 @@ describe('AuthController', () => {
 
 			await expect(
 				controller.magicLinkVerify({ token: 't' }, res),
+			).rejects.toBeInstanceOf(HttpException);
+		});
+	});
+
+	describe('linkGoogle', () => {
+		const profile = {
+			id: 'google-sub',
+			email: 'user@gmail.com',
+			name: 'User',
+			picture: null,
+			emailVerified: true,
+		};
+
+		it('throws 401 when there is no session', async () => {
+			mockedAuth.api.getSession.mockResolvedValue(null);
+			const req = { headers: {} } as never;
+
+			await expect(
+				controller.linkGoogle({ credential: 'id-token' }, req),
+			).rejects.toMatchObject({
+				status: 401,
+			});
+		});
+
+		it('verifies the credential and links to the current user', async () => {
+			mockedAuth.api.getSession.mockResolvedValue({
+				user: { id: 'u1' },
+			});
+			googleAuthService.verifyCredential.mockResolvedValue(profile);
+			googleAuthService.linkToUser.mockResolvedValue({
+				linked: true,
+			});
+			const req = { headers: {} } as never;
+
+			const result = await controller.linkGoogle(
+				{ credential: 'id-token' },
+				req,
+			);
+
+			expect(googleAuthService.verifyCredential).toHaveBeenCalledWith(
+				'id-token',
+			);
+			expect(googleAuthService.linkToUser).toHaveBeenCalledWith(
+				'u1',
+				profile,
+			);
+			expect(result).toEqual({ linked: true });
+		});
+
+		it('converts a service error into an HttpException', async () => {
+			mockedAuth.api.getSession.mockResolvedValue({
+				user: { id: 'u1' },
+			});
+			googleAuthService.verifyCredential.mockRejectedValue(
+				new Error('Google not configured'),
+			);
+			const req = { headers: {} } as never;
+
+			await expect(
+				controller.linkGoogle({ credential: 'id-token' }, req),
 			).rejects.toBeInstanceOf(HttpException);
 		});
 	});
