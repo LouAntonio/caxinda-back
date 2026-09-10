@@ -12,8 +12,7 @@ export class SearchController {
 
 	@Get()
 	@ApiOperation({
-		summary:
-			'Busca global pública em anúncios, empresas e utilizadores (relevância)',
+		summary: 'Busca global pública em anúncios e empresas (relevância)',
 	})
 	async search(@Query() query: GlobalSearchQueryDto) {
 		return this.searchService.searchPublic(query);

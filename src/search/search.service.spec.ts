@@ -8,7 +8,6 @@ describe('SearchService', () => {
 	let prisma: {
 		ad: { count: jest.Mock; findMany: jest.Mock };
 		business: { count: jest.Mock; findMany: jest.Mock };
-		user: { count: jest.Mock; findMany: jest.Mock };
 	};
 
 	const AD_ROW = {
@@ -35,19 +34,10 @@ describe('SearchService', () => {
 		owner: { id: 'u2', name: 'Ana', surname: 'Silva', image: null },
 	};
 
-	const USER_ROW = {
-		id: 'u3',
-		name: 'Carlos',
-		surname: 'Mendes',
-		image: null,
-		createdAt: new Date('2026-09-03T10:00:00Z'),
-	};
-
 	beforeEach(async () => {
 		prisma = {
 			ad: { count: jest.fn(), findMany: jest.fn() },
 			business: { count: jest.fn(), findMany: jest.fn() },
-			user: { count: jest.fn(), findMany: jest.fn() },
 		};
 
 		const moduleRef = await Test.createTestingModule({
@@ -65,8 +55,6 @@ describe('SearchService', () => {
 		prisma.ad.findMany.mockResolvedValue([AD_ROW]);
 		prisma.business.count.mockResolvedValue(1);
 		prisma.business.findMany.mockResolvedValue([BUSINESS_ROW]);
-		prisma.user.count.mockResolvedValue(1);
-		prisma.user.findMany.mockResolvedValue([USER_ROW]);
 
 		const result = await service.searchPublic({
 			q: 'ana',
@@ -74,12 +62,11 @@ describe('SearchService', () => {
 			limit: 20,
 		});
 
-		expect(result.total).toBe(3);
-		expect(result.items).toHaveLength(3);
+		expect(result.total).toBe(2);
+		expect(result.items).toHaveLength(2);
 		expect(result.totalPages).toBe(1);
 		expect((result.items[0] as { type: string }).type).toBe('BUSINESS');
-		expect((result.items[1] as { type: string }).type).toBe('USER');
-		expect((result.items[2] as { type: string }).type).toBe('AD');
+		expect((result.items[1] as { type: string }).type).toBe('AD');
 		expect(prisma.ad.findMany.mock.calls[0][0].where).toMatchObject({
 			status: 'ACTIVE',
 			visibility: 'VISIBLE',
@@ -96,8 +83,6 @@ describe('SearchService', () => {
 		prisma.ad.findMany.mockResolvedValue([AD_ROW]);
 		prisma.business.count.mockResolvedValue(0);
 		prisma.business.findMany.mockResolvedValue([]);
-		prisma.user.count.mockResolvedValue(0);
-		prisma.user.findMany.mockResolvedValue([]);
 
 		const result = await service.searchPublic({ q: 'iphone' });
 
@@ -124,7 +109,6 @@ describe('SearchService', () => {
 		expect(result.items).toHaveLength(1);
 		expect((result.items[0] as { type: string }).type).toBe('BUSINESS');
 		expect(prisma.ad.findMany).not.toHaveBeenCalled();
-		expect(prisma.user.findMany).not.toHaveBeenCalled();
 	});
 
 	it('aplica categoryId e province como filtros', async () => {
@@ -157,8 +141,6 @@ describe('SearchService', () => {
 		]);
 		prisma.business.count.mockResolvedValue(0);
 		prisma.business.findMany.mockResolvedValue([]);
-		prisma.user.count.mockResolvedValue(0);
-		prisma.user.findMany.mockResolvedValue([]);
 
 		const result = await service.searchPublic({ q: 'iphone', limit: 2 });
 

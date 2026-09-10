@@ -11,7 +11,7 @@ import {
 import { Province } from '../generated/prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
-export const SEARCH_TARGETS = ['AD', 'BUSINESS', 'USER'] as const;
+export const SEARCH_TARGETS = ['AD', 'BUSINESS'] as const;
 export type SearchTarget = (typeof SEARCH_TARGETS)[number];
 
 export class GlobalSearchQueryDto extends PaginationQueryDto {

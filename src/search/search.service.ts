@@ -33,14 +33,6 @@ const BUSINESS_SEARCH_SELECT = {
 	},
 } as const;
 
-const USER_SEARCH_SELECT = {
-	id: true,
-	name: true,
-	surname: true,
-	image: true,
-	createdAt: true,
-} as const;
-
 const MAX_PER_ENTITY = 500;
 
 type GroupedResult = [SearchTarget, number, object[]];
@@ -71,9 +63,6 @@ export class SearchService {
 					perEntityTake,
 				),
 			);
-		}
-		if (!target || target === 'USER') {
-			queries.push(this.searchUsers(q, perEntityTake));
 		}
 
 		const results = await Promise.all(queries);
@@ -192,40 +181,6 @@ export class SearchService {
 		}));
 
 		return ['BUSINESS', total, items];
-	}
-
-	private async searchUsers(q: string, take: number): Promise<GroupedResult> {
-		const where: Prisma.UserWhereInput = q
-			? {
-					OR: buildSearchOR(['name', 'surname'], q),
-				}
-			: {};
-
-		const [total, rows] = await Promise.all([
-			this.prisma.user.count({ where }),
-			this.prisma.user.findMany({
-				where,
-				orderBy: { createdAt: 'desc' },
-				take,
-				select: USER_SEARCH_SELECT,
-			}),
-		]);
-
-		const items = rows.map((row) => ({
-			type: 'USER' as const,
-			relevance: this.relevance(
-				q,
-				[[row.name, row.surname].filter(Boolean).join(' ')] as string[],
-				[20],
-			),
-			id: row.id,
-			name: row.name,
-			surname: row.surname,
-			image: row.image,
-			createdAt: row.createdAt,
-		}));
-
-		return ['USER', total, items];
 	}
 
 	private relevance(
