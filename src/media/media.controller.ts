@@ -29,6 +29,13 @@ export class MediaSignQueryDto {
 	folder: MediaFolder;
 
 	@ApiPropertyOptional({
+		description: 'Tipo de recurso para upload no Cloudinary',
+	})
+	@IsOptional()
+	@IsString()
+	resourceType?: string;
+
+	@ApiPropertyOptional({
 		description: 'Tags adicionais separadas por vírgula',
 	})
 	@IsOptional()
@@ -52,6 +59,9 @@ export class MediaController {
 			folder: query.folder,
 			...(query.tags ? { tags: query.tags } : {}),
 		});
-		return { ...params, resourceType: 'image' };
+		return {
+			...params,
+			...(query.resourceType ? { resourceType: query.resourceType } : {}),
+		};
 	}
 }

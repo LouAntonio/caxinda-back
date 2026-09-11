@@ -28,7 +28,7 @@ export class MagicLinkService {
 		});
 
 		const loginUrl = frontUrl(
-			`/auth/magic?token=${encodeURIComponent(token)}`,
+			`/auth/verificar?tipo=magic&token=${encodeURIComponent(token)}`,
 		);
 
 		await sendMailBridge({
