@@ -12,6 +12,7 @@ const AD_SEARCH_SELECT = {
 	description: true,
 	price: true,
 	image: true,
+	province: true,
 	verified: true,
 	createdAt: true,
 	user: {
@@ -52,7 +53,14 @@ export class SearchService {
 
 		const queries: Promise<GroupedResult>[] = [];
 		if (!target || target === 'AD') {
-			queries.push(this.searchAds(q, query.categoryId, perEntityTake));
+			queries.push(
+				this.searchAds(
+					q,
+					query.categoryId,
+					query.province,
+					perEntityTake,
+				),
+			);
 		}
 		if (!target || target === 'BUSINESS') {
 			queries.push(
@@ -69,19 +77,30 @@ export class SearchService {
 
 		const total = results.reduce((sum, [, count]) => sum + count, 0);
 
+		const sortBy = query.sortBy ?? 'relevance';
+
 		const merged = results
 			.flatMap(([, , items]) => items)
 			.sort((a, b) => {
+				const dateA = new Date(
+					(b as { createdAt: string }).createdAt,
+				).getTime();
+				const dateB = new Date(
+					(a as { createdAt: string }).createdAt,
+				).getTime();
+				if (sortBy === 'newest') {
+					return dateB - dateA;
+				}
+				if (sortBy === 'oldest') {
+					return dateA - dateB;
+				}
 				const scoreDiff =
 					Number((b as { relevance: number }).relevance) -
 					Number((a as { relevance: number }).relevance);
 				if (scoreDiff !== 0) {
 					return scoreDiff;
 				}
-				const dateDiff =
-					new Date((b as { createdAt: string }).createdAt).getTime() -
-					new Date((a as { createdAt: string }).createdAt).getTime();
-				return dateDiff || 0;
+				return dateB - dateA;
 			});
 
 		return paginate(
@@ -94,6 +113,7 @@ export class SearchService {
 	private async searchAds(
 		q: string,
 		categoryId: string | undefined,
+		province: string | undefined,
 		take: number,
 	): Promise<GroupedResult> {
 		const where: Prisma.AdWhereInput = {
@@ -101,6 +121,9 @@ export class SearchService {
 			visibility: 'VISIBLE',
 			...(q ? { OR: buildSearchOR(['title', 'description'], q) } : {}),
 			...(categoryId ? { categories: { some: { id: categoryId } } } : {}),
+			...(province
+				? { province: province as Prisma.AdWhereInput['province'] }
+				: {}),
 		};
 
 		const [total, rows] = await Promise.all([
@@ -126,6 +149,7 @@ export class SearchService {
 			description: row.description,
 			price: row.price === null ? null : row.price.toNumber(),
 			image: row.image,
+			province: row.province,
 			verified: row.verified,
 			createdAt: row.createdAt,
 			user: row.user,

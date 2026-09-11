@@ -344,6 +344,49 @@ export class PaymentsService {
 		return payments.map((payment) => this.toPublicPayment(payment));
 	}
 
+	async mySubscriptions(userId: string): Promise<unknown> {
+		await this.expireStaleSubscriptions();
+		const subscriptions = await this.prisma.subscription.findMany({
+			where: { business: { ownerId: userId } },
+			orderBy: { createdAt: 'desc' },
+			take: 50,
+			include: {
+				plan: true,
+				business: { select: { id: true, name: true, slug: true } },
+				payments: { orderBy: { createdAt: 'desc' } },
+			},
+		});
+		return subscriptions.map((sub) => ({
+			id: sub.id,
+			status: sub.status,
+			startDate: sub.startDate,
+			endDate: sub.endDate,
+			autoRenew: sub.autoRenew,
+			cancelledAt: sub.cancelledAt,
+			renewedAt: sub.renewedAt,
+			createdAt: sub.createdAt,
+			updatedAt: sub.updatedAt,
+			plan: {
+				id: sub.plan.id,
+				name: sub.plan.name,
+				price: sub.plan.price.toNumber(),
+				currency: sub.plan.currency,
+				durationDays: sub.plan.durationDays,
+			},
+			business: sub.business,
+			payments: sub.payments.map((p) => ({
+				id: p.id,
+				amount: p.amount.toNumber(),
+				status: p.status,
+				proofUrl: p.proofUrl,
+				proofAt: p.proofAt,
+				reviewedAt: p.reviewedAt,
+				adminNote: p.adminNote,
+				createdAt: p.createdAt,
+			})),
+		}));
+	}
+
 	async getById(
 		userId: string,
 		role: string,

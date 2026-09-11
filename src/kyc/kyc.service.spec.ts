@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { KycService } from './kyc.service';
+import { SubmitKycDto } from './kyc.dto';
 import { EmailService } from '../email/email.service';
 import { MediaService } from '../media/media.service';
 
@@ -36,10 +37,29 @@ describe('KycService', () => {
 		biBackUrl: 'https://cdn.test/bi-back.jpg',
 		biBackId: 'kyc/bi-back',
 		selfies: [],
+		fullBodyUrl: null,
+		fullBodyId: null,
 		verifiedAt: null,
 		createdAt: new Date('2026-01-01T00:00:00Z'),
 		updatedAt: new Date('2026-01-01T00:00:00Z'),
 	};
+
+	function kycDto(overrides: Partial<SubmitKycDto> = {}) {
+		return {
+			biFrontUrl: 'https://cdn.test/bi-front.jpg',
+			biFrontId: 'kyc/bi-front',
+			biBackUrl: 'https://cdn.test/bi-back.jpg',
+			biBackId: 'kyc/bi-back',
+			selfies: [
+				{ url: 'https://cdn.test/s1.jpg', cloudinaryId: 'kyc/s1' },
+				{ url: 'https://cdn.test/s2.jpg', cloudinaryId: 'kyc/s2' },
+				{ url: 'https://cdn.test/s3.jpg', cloudinaryId: 'kyc/s3' },
+			],
+			fullBodyUrl: 'https://cdn.test/full.jpg',
+			fullBodyId: 'kyc/full',
+			...overrides,
+		};
+	}
 
 	beforeEach(async () => {
 		prisma = {
@@ -77,12 +97,7 @@ describe('KycService', () => {
 			prisma.kYC.findUnique.mockResolvedValue(null);
 			prisma.kYC.create.mockResolvedValue({ ...userKyc });
 
-			const result = await service.submit('user-id', {
-				biFrontUrl: 'https://cdn.test/bi-front.jpg',
-				biFrontId: 'kyc/bi-front',
-				biBackUrl: 'https://cdn.test/bi-back.jpg',
-				biBackId: 'kyc/bi-back',
-			});
+			const result = await service.submit('user-id', kycDto());
 
 			expect(prisma.kYC.create).toHaveBeenCalled();
 			expect(result.status).toBe('PENDING');
@@ -96,12 +111,7 @@ describe('KycService', () => {
 			});
 
 			await expect(
-				service.submit('user-id', {
-					biFrontUrl: 'https://cdn.test/bi-front.jpg',
-					biFrontId: 'kyc/bi-front',
-					biBackUrl: 'https://cdn.test/bi-back.jpg',
-					biBackId: 'kyc/bi-back',
-				}),
+				service.submit('user-id', kycDto()),
 			).rejects.toBeInstanceOf(ConflictException);
 		});
 
@@ -116,12 +126,15 @@ describe('KycService', () => {
 				status: 'PENDING',
 			});
 
-			const result = await service.submit('user-id', {
-				biFrontUrl: 'https://cdn.test/bi-front-2.jpg',
-				biFrontId: 'kyc/bi-front-2',
-				biBackUrl: 'https://cdn.test/bi-back-2.jpg',
-				biBackId: 'kyc/bi-back-2',
-			});
+			const result = await service.submit(
+				'user-id',
+				kycDto({
+					biFrontUrl: 'https://cdn.test/bi-front-2.jpg',
+					biFrontId: 'kyc/bi-front-2',
+					biBackUrl: 'https://cdn.test/bi-back-2.jpg',
+					biBackId: 'kyc/bi-back-2',
+				}),
+			);
 
 			expect(prisma.kYC.update).toHaveBeenCalled();
 			expect(result.status).toBe('PENDING');
@@ -137,13 +150,16 @@ describe('KycService', () => {
 				status: 'PENDING',
 			});
 
-			await service.submit('user-id', {
-				biFrontUrl: 'https://cdn.test/bi-front-3.jpg',
-				biFrontId: 'kyc/bi-front-3',
-				biBackUrl: 'https://cdn.test/bi-back-3.jpg',
-				biBackId: 'kyc/bi-back-3',
-				selfies: [{ url: 'x', cloudinaryId: 'kyc/front-3' }],
-			});
+			await service.submit(
+				'user-id',
+				kycDto({
+					biFrontUrl: 'https://cdn.test/bi-front-3.jpg',
+					biFrontId: 'kyc/bi-front-3',
+					biBackUrl: 'https://cdn.test/bi-back-3.jpg',
+					biBackId: 'kyc/bi-back-3',
+					selfies: [{ url: 'x', cloudinaryId: 'kyc/front-3' }],
+				}),
+			);
 
 			expect(mediaService.enqueueDeletion).toHaveBeenCalledWith([
 				'kyc/bi-front',

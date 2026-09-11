@@ -23,6 +23,8 @@ export interface KycRecord {
 	biBackUrl: string;
 	biBackId: string;
 	selfies: unknown;
+	fullBodyUrl: string | null;
+	fullBodyId: string | null;
 	verifiedAt: Date | null;
 	createdAt: Date;
 	updatedAt: Date;
@@ -60,9 +62,9 @@ export class KycService {
 			biFrontId: dto.biFrontId,
 			biBackUrl: dto.biBackUrl,
 			biBackId: dto.biBackId,
-			selfies: (dto.selfies?.length
-				? dto.selfies
-				: []) as unknown as Prisma.InputJsonValue,
+			selfies: dto.selfies as unknown as Prisma.InputJsonValue,
+			fullBodyUrl: dto.fullBodyUrl,
+			fullBodyId: dto.fullBodyId,
 		};
 
 		const record = existing
@@ -205,6 +207,9 @@ export class KycService {
 				}
 			}
 		}
+		if (existing.fullBodyId) {
+			oldIds.push(existing.fullBodyId);
+		}
 		if (oldIds.length > 0) {
 			await this.mediaService.enqueueDeletion(oldIds);
 		}
@@ -218,9 +223,9 @@ export class KycService {
 				biFrontId: dto.biFrontId,
 				biBackUrl: dto.biBackUrl,
 				biBackId: dto.biBackId,
-				selfies: (dto.selfies?.length
-					? dto.selfies
-					: []) as unknown as Prisma.InputJsonValue,
+				selfies: dto.selfies as unknown as Prisma.InputJsonValue,
+				fullBodyUrl: dto.fullBodyUrl,
+				fullBodyId: dto.fullBodyId,
 			},
 		});
 	}

@@ -6,6 +6,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
+import { Province } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
@@ -75,10 +76,27 @@ export class BusinessesService {
 		);
 		const privileged = this.isPrivileged(viewer);
 
+		const provinces = query.provinces
+			? query.provinces
+					.split(',')
+					.map((p) => p.trim())
+					.filter(Boolean)
+			: [];
+		const categoryIds = query.categoryIds
+			? query.categoryIds
+					.split(',')
+					.map((id) => id.trim())
+					.filter(Boolean)
+			: [];
+
 		const where: Prisma.BusinessWhereInput = {
 			...(query.ownerId && { ownerId: query.ownerId }),
 			...(query.province && { province: query.province }),
+			...(provinces.length > 0 && {
+				province: { in: provinces as Province[] },
+			}),
 			...(query.categoryId && { categoryId: query.categoryId }),
+			...(categoryIds.length > 0 && { categoryId: { in: categoryIds } }),
 			...(query.q && {
 				OR: buildSearchOR(['name', 'description', 'phone'], query.q),
 			}),
@@ -150,6 +168,10 @@ export class BusinessesService {
 	async create(userId: string, role: string, dto: CreateBusinessDto) {
 		if (!this.canManage(role)) {
 			throw new ForbiddenException('Permissão insuficiente.');
+		}
+
+		if (!this.isPrivileged({ id: userId, role })) {
+			await this.assertApprovedKyc(userId);
 		}
 
 		const slug = dto.slug ?? slugify(dto.name);
@@ -357,6 +379,18 @@ export class BusinessesService {
 
 	private canManage(role: string): boolean {
 		return role === 'ADMIN' || role === 'MODERATOR' || role === 'PROMOTER';
+	}
+
+	private async assertApprovedKyc(userId: string): Promise<void> {
+		const kyc = await this.prisma.kYC.findUnique({
+			where: { userId },
+			select: { status: true },
+		});
+		if (kyc?.status !== 'APPROVED') {
+			throw new ForbiddenException(
+				'É necessário ter o KYC aprovado para registar empresas.',
+			);
+		}
 	}
 
 	private isOwnerOrPrivileged(

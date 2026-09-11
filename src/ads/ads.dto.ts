@@ -4,6 +4,7 @@ import {
 	ArrayMinSize,
 	IsArray,
 	IsBoolean,
+	IsEnum,
 	IsIn,
 	IsNotEmpty,
 	IsNumber,
@@ -19,6 +20,7 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { Province } from '../generated/prisma/client';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -89,6 +91,11 @@ export class CreateAdDto {
 	@IsNumber({}, { message: 'price deve ser um número' })
 	@Min(0)
 	price?: number;
+
+	@ApiPropertyOptional({ enum: Province })
+	@IsOptional()
+	@IsEnum(Province, { message: 'province inválida' })
+	province?: Province;
 
 	@ApiPropertyOptional({
 		example: 'iphone-12-64gb',
@@ -166,6 +173,11 @@ export class UpdateAdDto {
 	@Min(0)
 	price?: number;
 
+	@ApiPropertyOptional({ enum: Province, nullable: true })
+	@IsOptional()
+	@IsEnum(Province, { message: 'province inválida' })
+	province?: Province | null;
+
 	@ApiPropertyOptional({
 		example: 'iphone-12-64gb',
 		description:
@@ -239,6 +251,14 @@ export class AdQueryDto extends PaginationQueryDto {
 	@IsOptional()
 	@IsIn(AD_SORTS, { message: 'sortBy inválido' })
 	sortBy?: (typeof AD_SORTS)[number];
+
+	@ApiPropertyOptional({
+		enum: Province,
+		description: 'Filtrar por província',
+	})
+	@IsOptional()
+	@IsEnum(Province, { message: 'province inválida' })
+	province?: Province;
 
 	@ApiPropertyOptional({
 		description: 'IDs de categoria separados por vírgula (ex.: a,b,c)',

@@ -41,6 +41,7 @@ interface CacheableAd {
 	price: string | null;
 	status: string;
 	visibility: string;
+	province: string | null;
 	verified: boolean;
 	createdAt: Date;
 	updatedAt: Date;
@@ -161,6 +162,10 @@ export class AdsService {
 			if (ids.length) {
 				where.categories = { some: { id: { in: ids } } };
 			}
+		}
+
+		if (query.province) {
+			where.province = query.province;
 		}
 
 		if (query.userId) {
@@ -538,6 +543,7 @@ export class AdsService {
 				title: dto.title,
 				description: dto.description,
 				price: dto.price,
+				province: dto.province,
 				image: dto.image,
 				imageId: dto.imageId,
 				gallery: (dto.gallery ??
@@ -579,6 +585,7 @@ export class AdsService {
 				title: dto.title,
 				description: dto.description,
 				price: dto.price,
+				province: dto.province !== undefined ? dto.province : undefined,
 				image: dto.image,
 				imageId: dto.imageId,
 				gallery:
@@ -842,6 +849,7 @@ export class AdsService {
 			price: Prisma.Decimal | null;
 			status: string;
 			visibility: string;
+			province: string | null;
 			verified: boolean;
 			createdAt: Date;
 			updatedAt: Date;
@@ -865,6 +873,7 @@ export class AdsService {
 			price: ad.price === null ? null : ad.price.toNumber(),
 			status: ad.status,
 			visibility: ad.visibility,
+			province: ad.province,
 			verified: ad.verified,
 			createdAt: ad.createdAt,
 			updatedAt: ad.updatedAt,

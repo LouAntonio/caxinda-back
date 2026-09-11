@@ -179,6 +179,10 @@ model KYC {
   // Selfies
   selfies Json? @default("[]") @db.JsonB // Array de URLs e IDs do Cloudinary [{url, cloudinaryId}]
 
+  // Foto de corpo inteiro
+  fullBodyUrl String? @db.VarChar(2048)
+  fullBodyId  String? @db.VarChar(255) // Cloudinary Public ID
+
   verifiedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -239,6 +243,7 @@ model Ad {
   price       Decimal?     @db.Decimal(12, 2)
   status      AdStatus     @default(ACTIVE)
   visibility  AdVisibility @default(VISIBLE)
+  province    Province?
   verified    Boolean      @default(false)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt

@@ -103,6 +103,15 @@ export class PaymentsController {
 		return this.paymentsService.review(user, id, dto);
 	}
 
+	@Get('mine/subscriptions')
+	@ApiOperation({
+		summary: 'Listar as minhas subscrições de planos (dono das empresas)',
+	})
+	async mySubscriptions(@Req() req: Request) {
+		const user = await this.requireUser(req);
+		return this.paymentsService.mySubscriptions(user.id);
+	}
+
 	@Get('mine')
 	@ApiOperation({ summary: 'Listar os meus pagamentos (dono das empresas)' })
 	async mine(@Req() req: Request) {

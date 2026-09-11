@@ -62,6 +62,7 @@ describe('BusinessesService', () => {
 		};
 		category: { findUnique: jest.Mock };
 		review: { groupBy: jest.Mock };
+		kYC: { findUnique: jest.Mock };
 	};
 
 	beforeEach(async () => {
@@ -76,6 +77,9 @@ describe('BusinessesService', () => {
 			},
 			category: { findUnique: jest.fn() },
 			review: { groupBy: jest.fn().mockResolvedValue([]) },
+			kYC: {
+				findUnique: jest.fn().mockResolvedValue({ status: 'APPROVED' }),
+			},
 		};
 
 		analytics = { trackView: jest.fn() };
@@ -256,6 +260,22 @@ describe('BusinessesService', () => {
 				include: expect.anything(),
 			});
 			expect(result.slug).toBe('loja');
+		});
+
+		it('403 para PROMOTER sem KYC aprovado', async () => {
+			prisma.kYC.findUnique.mockResolvedValue({ status: 'PENDING' });
+
+			await expect(
+				service.create('owner-1', 'PROMOTER', dto),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('403 para PROMOTER sem registo KYC', async () => {
+			prisma.kYC.findUnique.mockResolvedValue(null);
+
+			await expect(
+				service.create('owner-1', 'PROMOTER', dto),
+			).rejects.toThrow(ForbiddenException);
 		});
 
 		it('usa o slug informado', async () => {

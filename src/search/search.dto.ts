@@ -14,6 +14,9 @@ import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 export const SEARCH_TARGETS = ['AD', 'BUSINESS'] as const;
 export type SearchTarget = (typeof SEARCH_TARGETS)[number];
 
+export const SEARCH_SORTS = ['relevance', 'newest', 'oldest'] as const;
+export type SearchSort = (typeof SEARCH_SORTS)[number];
+
 export class GlobalSearchQueryDto extends PaginationQueryDto {
 	@ApiProperty({ example: 'iphone', description: 'Termo de pesquisa' })
 	@IsString()
@@ -30,6 +33,15 @@ export class GlobalSearchQueryDto extends PaginationQueryDto {
 	type?: SearchTarget;
 
 	@ApiPropertyOptional({
+		enum: SEARCH_SORTS,
+		default: 'relevance',
+		description: 'Ordenação dos resultados',
+	})
+	@IsOptional()
+	@IsIn(SEARCH_SORTS, { message: 'sortBy inválido' })
+	sortBy?: SearchSort;
+
+	@ApiPropertyOptional({
 		example: '00000000-0000-7000-8000-000000000001',
 		description: 'Filtra anúncios/empresas de uma categoria',
 	})
@@ -39,7 +51,7 @@ export class GlobalSearchQueryDto extends PaginationQueryDto {
 
 	@ApiPropertyOptional({
 		enum: Province,
-		description: 'Filtra por província (apenas empresas)',
+		description: 'Filtra anúncios e empresas por província',
 	})
 	@IsOptional()
 	@IsEnum(Province, { message: 'province inválida' })

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
 	ArrayMaxSize,
+	ArrayMinSize,
 	IsArray,
 	IsIn,
 	IsInt,
@@ -41,16 +42,26 @@ export class SubmitKycDto {
 	@IsString()
 	biBackId: string;
 
-	@ApiPropertyOptional({
+	@ApiProperty({
 		type: [SelfieDto],
-		description: 'Selfies opcionais [{ url, cloudinaryId }]',
+		description: '3 selfies [{ url, cloudinaryId }]',
 	})
-	@IsOptional()
 	@IsArray()
-	@ArrayMaxSize(5)
+	@ArrayMinSize(3, { message: 'Envie exatamente 3 selfies' })
+	@ArrayMaxSize(3, { message: 'Envie exatamente 3 selfies' })
 	@ValidateNested({ each: true })
 	@Type(() => SelfieDto)
-	selfies?: SelfieDto[];
+	selfies: SelfieDto[];
+
+	@ApiProperty({ description: 'URL da foto de corpo inteiro' })
+	@IsUrl({}, { message: 'fullBodyUrl deve ser uma URL válida' })
+	fullBodyUrl: string;
+
+	@ApiProperty({
+		description: 'Public ID no Cloudinary da foto de corpo inteiro',
+	})
+	@IsString()
+	fullBodyId: string;
 }
 
 export class ReviewKycDto {

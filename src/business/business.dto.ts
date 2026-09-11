@@ -267,6 +267,22 @@ export class BusinessesQueryDto extends PaginationQueryDto {
 	@IsEnum(Province, { message: 'province inválida' })
 	province?: Province;
 
+	@ApiPropertyOptional({
+		description: 'Províncias separadas por vírgula (ex.: LUANDA,BENGUELA)',
+	})
+	@IsOptional()
+	@IsString()
+	@MaxLength(300)
+	provinces?: string;
+
+	@ApiPropertyOptional({
+		description: 'IDs de categoria separados por vírgula (ex.: a,b,c)',
+	})
+	@IsOptional()
+	@IsString()
+	@MaxLength(500)
+	categoryIds?: string;
+
 	@ApiPropertyOptional({ description: 'Filtrar por categoria' })
 	@IsOptional()
 	@IsUUID('7', { message: 'categoryId deve ser um UUID' })
