@@ -487,6 +487,41 @@ describe('PaymentsService', () => {
 			);
 		});
 
+		it('devolve: volta a PENDING e limpa o comprovativo', async () => {
+			prisma.payment.findUnique
+				.mockResolvedValueOnce(
+					paymentRow({
+						status: 'UNDER_REVIEW',
+						proofUrl: 'https://cdn.test/prova.jpg',
+						proofId: 'proof-1',
+					}),
+				)
+				.mockResolvedValue(paymentRow({ status: 'PENDING' }));
+			prisma.payment.update.mockResolvedValue(
+				paymentRow({ status: 'PENDING' }),
+			);
+
+			const result = await service.review(admin, 'pay-1', {
+				decision: 'RETURNED',
+				note: 'Reenviar comprovativo.',
+			});
+
+			expect(result).toHaveProperty('status', 'PENDING');
+			expect(prisma.payment.update).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						status: 'PENDING',
+						proofUrl: null,
+						proofId: null,
+						proofAt: null,
+						adminNote: 'Reenviar comprovativo.',
+						reviewedBy: 'admin-1',
+					}),
+				}),
+			);
+			expect(prisma.business.update).not.toHaveBeenCalled();
+		});
+
 		it('403/400 quando o pagamento está cancelado ou aprovado', async () => {
 			prisma.payment.findUnique.mockResolvedValue(
 				paymentRow({ status: 'CANCELLED' }),

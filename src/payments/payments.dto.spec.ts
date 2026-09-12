@@ -75,7 +75,7 @@ describe('Payments DTOs', () => {
 	});
 
 	describe('ReviewPaymentDto', () => {
-		it('aceita APPOVED/REJECTED e note opcional', async () => {
+		it('aceita APPROVED/REJECTED/RETURNED e note opcional', async () => {
 			await expect(
 				errorsOf(ReviewPaymentDto, { decision: 'APPROVED' }),
 			).resolves.toEqual([]);
@@ -83,6 +83,12 @@ describe('Payments DTOs', () => {
 				errorsOf(ReviewPaymentDto, {
 					decision: 'REJECTED',
 					note: 'Comprovativo inválido.',
+				}),
+			).resolves.toEqual([]);
+			await expect(
+				errorsOf(ReviewPaymentDto, {
+					decision: 'RETURNED',
+					note: 'Reenviar comprovativo.',
 				}),
 			).resolves.toEqual([]);
 		});

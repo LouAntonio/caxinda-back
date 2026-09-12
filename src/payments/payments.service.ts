@@ -271,6 +271,21 @@ export class PaymentsService {
 			return this.toPublicPayment(updated);
 		}
 
+		if (dto.decision === 'RETURNED') {
+			const updated = await this.prisma.payment.update({
+				where: { id: paymentId },
+				data: {
+					status: 'PENDING',
+					proofUrl: null,
+					proofId: null,
+					proofAt: null,
+					...base,
+				},
+				include: PAYMENT_INCLUDE,
+			});
+			return this.toPublicPayment(updated);
+		}
+
 		if (payment.status !== 'UNDER_REVIEW') {
 			throw new BadRequestException(
 				'Aprovação requer um comprovativo submetido.',

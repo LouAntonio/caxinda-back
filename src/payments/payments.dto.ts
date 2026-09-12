@@ -39,9 +39,12 @@ export class SubmitPaymentProofDto {
 }
 
 export class ReviewPaymentDto {
-	@ApiProperty({ enum: ['APPROVED', 'REJECTED'], example: 'APPROVED' })
-	@IsIn(['APPROVED', 'REJECTED'], {
-		message: 'decision deve ser APPROVED ou REJECTED',
+	@ApiProperty({
+		enum: ['APPROVED', 'REJECTED', 'RETURNED'],
+		example: 'APPROVED',
+	})
+	@IsIn(['APPROVED', 'REJECTED', 'RETURNED'], {
+		message: 'decision deve ser APPROVED, REJECTED ou RETURNED',
 	})
 	decision: string;
 
