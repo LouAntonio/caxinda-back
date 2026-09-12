@@ -23,6 +23,7 @@ import {
 	AdProximityQueryDto,
 	AdQueryDto,
 	CreateAdDto,
+	FeatureAdDto,
 	ModerateAdDto,
 	UpdateAdDto,
 	UpdateVisibilityDto,
@@ -147,15 +148,17 @@ export class AdsController {
 
 	@Post(':id/feature')
 	@ApiOperation({ summary: 'Destacar anúncio (dono, usando quota do plano)' })
-	@RequirePermission({ ad: ['edit'] })
-	async feature(@Req() req: Request, @Param('id') id: string) {
+	async feature(
+		@Req() req: Request,
+		@Param('id') id: string,
+		@Body() dto: FeatureAdDto,
+	) {
 		const user = await this.requireUser(req);
-		return this.adsService.feature(user.id, id);
+		return this.adsService.feature(user.id, user.role, id, dto.days);
 	}
 
 	@Delete(':id/feature')
 	@ApiOperation({ summary: 'Remover destaque (dono ou admin/moderador)' })
-	@RequirePermission({ ad: ['edit'] })
 	async unfeature(@Req() req: Request, @Param('id') id: string) {
 		const user = await this.requireUser(req);
 		return this.adsService.unfeature(user.id, user.role, id);

@@ -34,6 +34,8 @@ describe('BusinessesController', () => {
 		setStatus: jest.Mock;
 		moderate: jest.Mock;
 		remove: jest.Mock;
+		feature: jest.Mock;
+		unfeature: jest.Mock;
 	};
 
 	const sessionUser = {
@@ -54,6 +56,8 @@ describe('BusinessesController', () => {
 			setStatus: jest.fn().mockResolvedValue({}),
 			moderate: jest.fn().mockResolvedValue({}),
 			remove: jest.fn().mockResolvedValue(undefined),
+			feature: jest.fn().mockResolvedValue({}),
+			unfeature: jest.fn().mockResolvedValue({}),
 		};
 
 		const moduleRef = await Test.createTestingModule({
@@ -172,6 +176,32 @@ describe('BusinessesController', () => {
 		expect(result).toBeUndefined();
 	});
 
+	it('feature repassa userId, role, id e days', async () => {
+		const req = mockRequest();
+		const dto = { days: 7 };
+
+		await controller.feature(req, 'biz-1', dto);
+
+		expect(service.feature).toHaveBeenCalledWith(
+			'u1',
+			'PROMOTER',
+			'biz-1',
+			7,
+		);
+	});
+
+	it('unfeature repassa userId, role e id', async () => {
+		const req = mockRequest();
+
+		await controller.unfeature(req, 'biz-1');
+
+		expect(service.unfeature).toHaveBeenCalledWith(
+			'u1',
+			'PROMOTER',
+			'biz-1',
+		);
+	});
+
 	describe('metadata de permissões por rota', () => {
 		it('list, getBySlug e getById são públicas', () => {
 			const methods: Array<'list' | 'getBySlug' | 'getById'> = [
@@ -229,6 +259,21 @@ describe('BusinessesController', () => {
 					BusinessesController.prototype.remove,
 				),
 			).toEqual({ business: ['delete'] });
+		});
+
+		it('feature e unfeature são acessíveis a qualquer sessão', () => {
+			expect(
+				Reflect.getMetadata(
+					REQUIRED_PERMISSIONS_KEY,
+					BusinessesController.prototype.feature,
+				),
+			).toBeUndefined();
+			expect(
+				Reflect.getMetadata(
+					REQUIRED_PERMISSIONS_KEY,
+					BusinessesController.prototype.unfeature,
+				),
+			).toBeUndefined();
 		});
 	});
 });

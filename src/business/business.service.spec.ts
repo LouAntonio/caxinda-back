@@ -58,11 +58,16 @@ describe('BusinessesService', () => {
 			findUnique: jest.Mock;
 			create: jest.Mock;
 			update: jest.Mock;
+			updateMany: jest.Mock;
 			delete: jest.Mock;
 		};
 		category: { findUnique: jest.Mock };
 		review: { groupBy: jest.Mock };
 		kYC: { findUnique: jest.Mock };
+		subscription: {
+			findFirst: jest.Mock;
+			findMany: jest.Mock;
+		};
 	};
 
 	beforeEach(async () => {
@@ -73,12 +78,17 @@ describe('BusinessesService', () => {
 				findUnique: jest.fn(),
 				create: jest.fn(),
 				update: jest.fn(),
+				updateMany: jest.fn().mockResolvedValue({ count: 0 }),
 				delete: jest.fn(),
 			},
 			category: { findUnique: jest.fn() },
 			review: { groupBy: jest.fn().mockResolvedValue([]) },
 			kYC: {
 				findUnique: jest.fn().mockResolvedValue({ status: 'APPROVED' }),
+			},
+			subscription: {
+				findFirst: jest.fn(),
+				findMany: jest.fn().mockResolvedValue([]),
 			},
 		};
 
@@ -504,6 +514,182 @@ describe('BusinessesService', () => {
 
 			await expect(
 				service.remove('outro', 'USER', 'biz-1'),
+			).rejects.toThrow(ForbiddenException);
+		});
+	});
+
+	describe('feature', () => {
+		it('404 para empresa inexistente', async () => {
+			prisma.business.findUnique.mockResolvedValue(null);
+
+			await expect(
+				service.feature('owner-1', 'PROMOTER', 'ghost'),
+			).rejects.toThrow(NotFoundException);
+		});
+
+		it('403 para não-dono (sem privilégios)', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+
+			await expect(
+				service.feature('outro', 'USER', 'biz-1'),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('Conflict se já está em destaque ativo', async () => {
+			prisma.business.findUnique.mockResolvedValue(
+				businessRow({
+					featured: true,
+					featuredUntil: new Date(Date.now() + 999999),
+				}),
+			);
+
+			await expect(
+				service.feature('owner-1', 'PROMOTER', 'biz-1'),
+			).rejects.toThrow(ConflictException);
+		});
+
+		it('BadRequest se empresa não está SHOW', async () => {
+			prisma.business.findUnique.mockResolvedValue(
+				businessRow({ status: 'HIDDEN' }),
+			);
+
+			await expect(
+				service.feature('owner-1', 'PROMOTER', 'biz-1'),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('Forbidden quando a empresa não tem plano ativo com destaque', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+			prisma.subscription.findFirst.mockResolvedValue(null);
+
+			await expect(
+				service.feature('owner-1', 'PROMOTER', 'biz-1'),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('Conflict quando o limite de destaques do plano é atingido', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+			prisma.subscription.findFirst.mockResolvedValue({
+				plan: { featuredAdsLimit: 1 },
+			});
+			prisma.business.count.mockResolvedValue(1);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 1 } },
+			]);
+
+			await expect(
+				service.feature('owner-1', 'PROMOTER', 'biz-1'),
+			).rejects.toThrow(ConflictException);
+		});
+
+		it('dono destaca a empresa (default 30 dias)', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+			prisma.subscription.findFirst.mockResolvedValue({
+				plan: { featuredAdsLimit: 2 },
+			});
+			prisma.business.count.mockResolvedValue(0);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
+			prisma.business.update.mockResolvedValue(businessRow());
+
+			await service.feature('owner-1', 'PROMOTER', 'biz-1');
+
+			expect(prisma.business.update).toHaveBeenCalled();
+			const updateArg = prisma.business.update.mock.calls[0][0] as {
+				where: { id: string };
+				data: {
+					featured: boolean;
+					featuredUntil: Date;
+					featuredAt: Date;
+				};
+			};
+			expect(updateArg.where.id).toBe('biz-1');
+			expect(updateArg.data.featured).toBe(true);
+			expect(updateArg.data.featuredUntil).toBeInstanceOf(Date);
+			expect(updateArg.data.featuredAt).toBeInstanceOf(Date);
+		});
+
+		it('usa days quando fornecido', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+			prisma.subscription.findFirst.mockResolvedValue({
+				plan: { featuredAdsLimit: 2 },
+			});
+			prisma.business.count.mockResolvedValue(0);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
+			prisma.business.update.mockResolvedValue(businessRow());
+
+			await service.feature('owner-1', 'PROMOTER', 'biz-1', 7);
+
+			const updateArg = prisma.business.update.mock.calls[0][0] as {
+				data: { featuredUntil: Date };
+			};
+			const expected = Date.now() + 7 * 24 * 60 * 60 * 1000;
+			expect(updateArg.data.featuredUntil.getTime()).toBeGreaterThan(
+				expected - 1000,
+			);
+			expect(updateArg.data.featuredUntil.getTime()).toBeLessThanOrEqual(
+				expected + 1000,
+			);
+		});
+
+		it('ADMIN pode destacar empresa de outro (ignora quota)', async () => {
+			prisma.business.findUnique.mockResolvedValue(
+				businessRow({
+					ownerId: 'owner-1',
+					featured: false,
+					featuredUntil: null,
+				}),
+			);
+			prisma.business.update.mockResolvedValue(businessRow());
+
+			await expect(
+				service.feature('admin', 'ADMIN', 'biz-1'),
+			).resolves.toBeDefined();
+
+			expect(prisma.subscription.findMany).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('unfeature', () => {
+		it('404 para empresa inexistente', async () => {
+			prisma.business.findUnique.mockResolvedValue(null);
+
+			await expect(
+				service.unfeature('owner-1', 'PROMOTER', 'ghost'),
+			).rejects.toThrow(NotFoundException);
+		});
+
+		it('dono remove o destaque', async () => {
+			prisma.business.findUnique.mockResolvedValue({
+				id: 'biz-1',
+				ownerId: 'owner-1',
+			});
+			prisma.business.update.mockResolvedValue(businessRow());
+
+			await service.unfeature('owner-1', 'PROMOTER', 'biz-1');
+
+			expect(prisma.business.update).toHaveBeenCalledWith({
+				where: { id: 'biz-1' },
+				data: {
+					featured: false,
+					featuredUntil: null,
+					featuredAt: null,
+				},
+				include: expect.any(Object),
+			});
+		});
+
+		it('403 para não-dono', async () => {
+			prisma.business.findUnique.mockResolvedValue({
+				id: 'biz-1',
+				ownerId: 'owner-1',
+			});
+
+			await expect(
+				service.unfeature('outro', 'USER', 'biz-1'),
 			).rejects.toThrow(ForbiddenException);
 		});
 	});

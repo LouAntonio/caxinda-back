@@ -6,13 +6,16 @@ import {
 	IsEmail,
 	IsEnum,
 	IsIn,
+	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUrl,
 	IsUUID,
 	Matches,
+	Max,
 	MaxLength,
+	Min,
 	ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -294,4 +297,14 @@ export class BusinessesQueryDto extends PaginationQueryDto {
 	@IsOptional()
 	@IsUUID('7', { message: 'ownerId deve ser um UUID' })
 	ownerId?: string;
+}
+
+export class FeatureBusinessDto {
+	@ApiPropertyOptional({ description: 'Duração do destaque em dias (1-90)' })
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt({ message: 'days deve ser um inteiro' })
+	@Min(1, { message: 'days deve ser pelo menos 1' })
+	@Max(90, { message: 'days não pode exceder 90' })
+	days?: number;
 }

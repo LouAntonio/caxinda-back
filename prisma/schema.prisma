@@ -375,6 +375,11 @@ model Business {
   isVerified Boolean        @default(false)
   status     BusinessStatus @default(SHOW)
 
+  // Destaque (benefício de plano)
+  featured      Boolean   @default(false)
+  featuredUntil DateTime?
+  featuredAt    DateTime?
+
   // Analytics (totais de exibição, alimentados por job)
   viewCount  Int @default(0)
   clickCount Int @default(0)
@@ -389,6 +394,7 @@ model Business {
   @@index([status])
   @@index([province])
   @@index([categoryId])
+  @@index([featured, featuredUntil])
   @@map("business")
 }
 

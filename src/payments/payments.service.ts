@@ -387,6 +387,10 @@ export class PaymentsService {
 				price: sub.plan.price.toNumber(),
 				currency: sub.plan.currency,
 				durationDays: sub.plan.durationDays,
+				description: sub.plan.description,
+				benefits: sub.plan.benefits,
+				businessVisibilityLimit: sub.plan.businessVisibilityLimit,
+				featuredAdsLimit: sub.plan.featuredAdsLimit,
 			},
 			business: sub.business,
 			payments: sub.payments.map((p) => ({

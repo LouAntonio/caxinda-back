@@ -404,6 +404,147 @@ export class BusinessesService {
 		);
 	}
 
+	async feature(
+		userId: string,
+		viewerRole: string,
+		businessId: string,
+		days = 30,
+	) {
+		const privileged = this.isPrivileged({ id: userId, role: viewerRole });
+		const business = await this.prisma.business.findUnique({
+			where: { id: businessId },
+			select: {
+				id: true,
+				ownerId: true,
+				status: true,
+				featured: true,
+				featuredUntil: true,
+			},
+		});
+		if (!business) {
+			throw new NotFoundException('Empresa não encontrada.');
+		}
+		if (business.ownerId !== userId && !privileged) {
+			throw new ForbiddenException(
+				'Você só pode destacar as suas próprias empresas.',
+			);
+		}
+		if (business.status !== 'SHOW') {
+			throw new BadRequestException(
+				'Uma empresa só pode ser destacada quando está visível.',
+			);
+		}
+		if (
+			business.featured &&
+			business.featuredUntil &&
+			business.featuredUntil > new Date()
+		) {
+			throw new ConflictException('Esta empresa já está em destaque.');
+		}
+
+		await this.expireStaleFeaturedBusinesses();
+
+		if (!privileged) {
+			await this.assertBusinessFeatureQuota(userId, businessId);
+		}
+
+		const now = new Date();
+		const featuredUntil = new Date(
+			now.getTime() + days * 24 * 60 * 60 * 1000,
+		);
+
+		const updated = await this.prisma.business.update({
+			where: { id: businessId },
+			data: { featured: true, featuredUntil, featuredAt: now },
+			include: BUSINESS_INCLUDE,
+		});
+
+		return this.toPublicBusiness(updated);
+	}
+
+	async unfeature(userId: string, viewerRole: string, businessId: string) {
+		const business = await this.prisma.business.findUnique({
+			where: { id: businessId },
+			select: { id: true, ownerId: true },
+		});
+		if (!business) {
+			throw new NotFoundException('Empresa não encontrada.');
+		}
+		if (
+			business.ownerId !== userId &&
+			!this.isPrivileged({ id: userId, role: viewerRole })
+		) {
+			throw new ForbiddenException(
+				'Permissão insuficiente para remover o destaque.',
+			);
+		}
+
+		const updated = await this.prisma.business.update({
+			where: { id: businessId },
+			data: { featured: false, featuredUntil: null, featuredAt: null },
+			include: BUSINESS_INCLUDE,
+		});
+
+		return this.toPublicBusiness(updated);
+	}
+
+	private async expireStaleFeaturedBusinesses() {
+		const now = new Date();
+		await this.prisma.business.updateMany({
+			where: { featured: true, featuredUntil: { lt: now } },
+			data: { featured: false, featuredUntil: null, featuredAt: null },
+		});
+	}
+
+	private async assertBusinessFeatureQuota(
+		userId: string,
+		businessId: string,
+	): Promise<void> {
+		const now = new Date();
+		const [subscription, activeFeatured, quotaRows] = await Promise.all([
+			this.prisma.subscription.findFirst({
+				where: {
+					businessId,
+					userId,
+					status: 'ACTIVE',
+					endDate: { gt: now },
+				},
+				orderBy: { endDate: 'desc' },
+				select: { plan: { select: { featuredAdsLimit: true } } },
+			}),
+			this.prisma.business.count({
+				where: {
+					ownerId: userId,
+					featured: true,
+					featuredUntil: { gt: now },
+				},
+			}),
+			this.prisma.subscription.findMany({
+				where: {
+					userId,
+					status: 'ACTIVE',
+					endDate: { gt: now },
+					plan: { featuredAdsLimit: { gt: 0 } },
+				},
+				select: { plan: { select: { featuredAdsLimit: true } } },
+			}),
+		]);
+		if (!subscription || subscription.plan.featuredAdsLimit <= 0) {
+			throw new ForbiddenException(
+				'Esta empresa não tem um plano ativo que inclua destaque.',
+			);
+		}
+		const quota = quotaRows.reduce(
+			(sum, row) => sum + row.plan.featuredAdsLimit,
+			0,
+		);
+		if (activeFeatured >= quota) {
+			throw new ConflictException(
+				'Atingiste o limite de empresas em destaque do teu plano.',
+			);
+		}
+	}
+
 	private canView(
 		business: { ownerId: string; status: string },
 		viewer?: BusinessSessionUser,
@@ -417,16 +558,24 @@ export class BusinessesService {
 	private orderBy(
 		sortBy?: string,
 	): Prisma.BusinessOrderByWithRelationInput[] {
+		const sort: Prisma.BusinessOrderByWithRelationInput[] = [
+			{ featured: 'desc' },
+		];
 		switch (sortBy) {
 			case 'name_asc':
-				return [{ name: 'asc' }];
+				sort.push({ name: 'asc' });
+				break;
 			case 'name_desc':
-				return [{ name: 'desc' }];
+				sort.push({ name: 'desc' });
+				break;
 			case 'oldest':
-				return [{ createdAt: 'asc' }];
+				sort.push({ createdAt: 'asc' });
+				break;
 			default:
-				return [{ createdAt: 'desc' }];
+				sort.push({ createdAt: 'desc' });
+				break;
 		}
+		return sort;
 	}
 
 	private async toPublicBusinesses(
@@ -486,6 +635,8 @@ export class BusinessesService {
 			status: business.status,
 			viewCount: business.viewCount,
 			clickCount: business.clickCount,
+			featured: business.featured,
+			featuredUntil: business.featuredUntil,
 			reviewCount: stats?.reviewCount ?? business._count.reviews,
 			averageRating: stats?.averageRating ?? null,
 			createdAt: business.createdAt,
@@ -532,6 +683,8 @@ export interface PublicBusiness {
 	status: string;
 	viewCount: number;
 	clickCount: number;
+	featured: boolean;
+	featuredUntil: Date | null;
 	reviewCount: number;
 	averageRating: number | null;
 	createdAt: Date;

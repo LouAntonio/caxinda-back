@@ -36,6 +36,10 @@ describe('AdsService', () => {
 		};
 		category: { findMany: jest.Mock };
 		user: { findUnique: jest.Mock };
+		subscription: {
+			findMany: jest.Mock;
+			findFirst: jest.Mock;
+		};
 		$queryRaw: jest.Mock;
 		$executeRaw: jest.Mock;
 	};
@@ -122,6 +126,10 @@ describe('AdsService', () => {
 			},
 			category: { findMany: jest.fn() },
 			user: { findUnique: jest.fn() },
+			subscription: {
+				findMany: jest.fn().mockResolvedValue([]),
+				findFirst: jest.fn(),
+			},
 			$queryRaw: jest.fn().mockResolvedValue([]),
 			$executeRaw: jest.fn(),
 		};
@@ -357,9 +365,9 @@ describe('AdsService', () => {
 		it('lança NotFound para anúncio inexistente', async () => {
 			prisma.ad.findUnique.mockResolvedValue(null);
 
-			await expect(service.feature('owner-id', 'ad-x')).rejects.toThrow(
-				NotFoundException,
-			);
+			await expect(
+				service.feature('owner-id', 'USER', 'ad-x'),
+			).rejects.toThrow(NotFoundException);
 		});
 
 		it('lança Forbidden se não é o dono', async () => {
@@ -368,9 +376,21 @@ describe('AdsService', () => {
 				userId: 'other',
 			});
 
-			await expect(service.feature('owner-id', 'ad-1')).rejects.toThrow(
-				ForbiddenException,
-			);
+			await expect(
+				service.feature('owner-id', 'USER', 'ad-1'),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('ADMIN/Moderador pode destacar anúncio de outro', async () => {
+			prisma.ad.findUnique.mockResolvedValue({
+				...adRow,
+				userId: 'other',
+			});
+			prisma.ad.update.mockResolvedValue({ ...adRow, featured: true });
+
+			await expect(
+				service.feature('admin-id', 'ADMIN', 'ad-1'),
+			).resolves.toBeDefined();
 		});
 
 		it('lança BadRequest se anúncio não está ativo/visível', async () => {
@@ -379,9 +399,9 @@ describe('AdsService', () => {
 				status: 'ARCHIVED',
 			});
 
-			await expect(service.feature('owner-id', 'ad-1')).rejects.toThrow(
-				BadRequestException,
-			);
+			await expect(
+				service.feature('owner-id', 'USER', 'ad-1'),
+			).rejects.toThrow(BadRequestException);
 		});
 
 		it('lança Conflict se já está em destaque ativo', async () => {
@@ -391,16 +411,40 @@ describe('AdsService', () => {
 				featuredUntil: new Date(Date.now() + 999999),
 			});
 
-			await expect(service.feature('owner-id', 'ad-1')).rejects.toThrow(
-				ConflictException,
-			);
+			await expect(
+				service.feature('owner-id', 'USER', 'ad-1'),
+			).rejects.toThrow(ConflictException);
 		});
 
-		it('destaca anúncio até now + 30 dias', async () => {
+		it('lança Conflict quando o plano não inclui destaques', async () => {
 			prisma.ad.findUnique.mockResolvedValue(adRow);
+
+			await expect(
+				service.feature('owner-id', 'USER', 'ad-1'),
+			).rejects.toThrow(ForbiddenException);
+		});
+
+		it('lança Conflict quando o limite de destaques ativos é atingido', async () => {
+			prisma.ad.findUnique.mockResolvedValue(adRow);
+			prisma.ad.count.mockResolvedValue(2);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
+
+			await expect(
+				service.feature('owner-id', 'USER', 'ad-1'),
+			).rejects.toThrow(ConflictException);
+		});
+
+		it('destaca anúncio até now + 30 dias (default)', async () => {
+			prisma.ad.findUnique.mockResolvedValue(adRow);
+			prisma.ad.count.mockResolvedValue(0);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
 			prisma.ad.update.mockResolvedValue({ ...adRow, featured: true });
 
-			await service.feature('owner-id', 'ad-1');
+			await service.feature('owner-id', 'USER', 'ad-1');
 
 			expect(prisma.ad.update).toHaveBeenCalled();
 			const updateArg = prisma.ad.update.mock.calls[0][0];
@@ -408,6 +452,33 @@ describe('AdsService', () => {
 			expect(updateArg.data.featured).toBe(true);
 			expect(updateArg.data.featuredUntil).toBeInstanceOf(Date);
 			expect(updateArg.data.featuredAt).toBeInstanceOf(Date);
+		});
+
+		it('usa days quando fornecido', async () => {
+			prisma.ad.findUnique.mockResolvedValue(adRow);
+			prisma.ad.count.mockResolvedValue(0);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
+			prisma.ad.update.mockResolvedValue({ ...adRow, featured: true });
+
+			await service.feature('owner-id', 'USER', 'ad-1', 7);
+
+			const updateArg = prisma.ad.update.mock.calls[0][0] as {
+				where: { id: string };
+				data: {
+					featured: boolean;
+					featuredUntil: Date;
+					featuredAt: Date;
+				};
+			};
+			const expected = Date.now() + 7 * 24 * 60 * 60 * 1000;
+			expect(updateArg.data.featuredUntil.getTime()).toBeGreaterThan(
+				expected - 1000,
+			);
+			expect(updateArg.data.featuredUntil.getTime()).toBeLessThanOrEqual(
+				expected + 1000,
+			);
 		});
 	});
 

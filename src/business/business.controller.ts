@@ -20,6 +20,7 @@ import { RequirePermission } from '../auth/decorators/roles.decorator';
 import {
 	BusinessesQueryDto,
 	CreateBusinessDto,
+	FeatureBusinessDto,
 	ModerateBusinessDto,
 	UpdateBusinessDto,
 	UpdateBusinessStatusDto,
@@ -117,6 +118,24 @@ export class BusinessesController {
 	@RequirePermission({ business: ['moderate'] })
 	async moderate(@Param('id') id: string, @Body() dto: ModerateBusinessDto) {
 		return this.businessesService.moderate(id, dto);
+	}
+
+	@Post(':id/feature')
+	@ApiOperation({ summary: 'Destacar empresa (dono, usando quota do plano)' })
+	async feature(
+		@Req() req: Request,
+		@Param('id') id: string,
+		@Body() dto: FeatureBusinessDto,
+	) {
+		const user = await this.requireUser(req);
+		return this.businessesService.feature(user.id, user.role, id, dto.days);
+	}
+
+	@Delete(':id/feature')
+	@ApiOperation({ summary: 'Remover destaque (dono ou admin/moderador)' })
+	async unfeature(@Req() req: Request, @Param('id') id: string) {
+		const user = await this.requireUser(req);
+		return this.businessesService.unfeature(user.id, user.role, id);
 	}
 
 	@Delete(':id')

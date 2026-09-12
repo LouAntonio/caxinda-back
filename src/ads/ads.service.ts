@@ -439,7 +439,13 @@ export class AdsService {
 		return Promise.resolve(undefined);
 	}
 
-	async feature(userId: string, adId: string) {
+	async feature(
+		userId: string,
+		viewerRole: string,
+		adId: string,
+		days = FEATURED_DURATION_DAYS,
+	) {
+		const privileged = this.isPrivileged({ id: userId, role: viewerRole });
 		const ad = await this.prisma.ad.findUnique({
 			where: { id: adId },
 			select: {
@@ -454,7 +460,7 @@ export class AdsService {
 		if (!ad) {
 			throw new NotFoundException('Anúncio não encontrado.');
 		}
-		if (ad.userId !== userId) {
+		if (ad.userId !== userId && !privileged) {
 			throw new ForbiddenException(
 				'Você só pode destacar os seus próprios anúncios.',
 			);
@@ -471,9 +477,13 @@ export class AdsService {
 
 		await this.expireStaleFeatured();
 
+		if (!privileged) {
+			await this.assertFeatureQuota(userId);
+		}
+
 		const now = new Date();
 		const featuredUntil = new Date(
-			now.getTime() + FEATURED_DURATION_DAYS * 24 * 60 * 60 * 1000,
+			now.getTime() + days * 24 * 60 * 60 * 1000,
 		);
 
 		const updated = await this.prisma.ad.update({
@@ -485,6 +495,42 @@ export class AdsService {
 		await this.invalidateAdCache(adId);
 
 		return updated;
+	}
+
+	private async assertFeatureQuota(userId: string): Promise<void> {
+		const now = new Date();
+		const [activeFeaturedAds, quotaRows] = await Promise.all([
+			this.prisma.ad.count({
+				where: {
+					userId,
+					featured: true,
+					featuredUntil: { gt: now },
+				},
+			}),
+			this.prisma.subscription.findMany({
+				where: {
+					userId,
+					status: 'ACTIVE',
+					endDate: { gt: now },
+					plan: { featuredAdsLimit: { gt: 0 } },
+				},
+				select: { plan: { select: { featuredAdsLimit: true } } },
+			}),
+		]);
+		const quota = quotaRows.reduce(
+			(sum, row) => sum + row.plan.featuredAdsLimit,
+			0,
+		);
+		if (quota <= 0) {
+			throw new ForbiddenException(
+				'O teu plano não inclui anúncios em destaque.',
+			);
+		}
+		if (activeFeaturedAds >= quota) {
+			throw new ConflictException(
+				'Atingiste o limite de anúncios em destaque do teu plano.',
+			);
+		}
 	}
 
 	async unfeature(userId: string, viewerRole: string, adId: string) {

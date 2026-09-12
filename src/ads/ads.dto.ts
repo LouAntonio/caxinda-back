@@ -6,6 +6,7 @@ import {
 	IsBoolean,
 	IsEnum,
 	IsIn,
+	IsInt,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -399,4 +400,14 @@ export class AdminListAdsQueryDto extends PaginationQueryDto {
 	@IsString()
 	@MaxLength(120)
 	sellerName?: string;
+}
+
+export class FeatureAdDto {
+	@ApiPropertyOptional({ description: 'Duração do destaque em dias (1-90)' })
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt({ message: 'days deve ser um inteiro' })
+	@Min(1, { message: 'days deve ser pelo menos 1' })
+	@Max(90, { message: 'days não pode exceder 90' })
+	days?: number;
 }

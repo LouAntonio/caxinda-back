@@ -209,12 +209,26 @@ describe('AdsController', () => {
 		expect(result).toBeUndefined();
 	});
 
-	it('feature resolve a sessão e delega com userId', async () => {
+	it('feature resolve a sessão e delega com days', async () => {
+		const req = mockRequest();
+		const dto = { days: 7 };
+
+		await controller.feature(req, 'ad-1', dto);
+
+		expect(service.feature).toHaveBeenCalledWith('u1', 'USER', 'ad-1', 7);
+	});
+
+	it('feature sem days delega com undefined', async () => {
 		const req = mockRequest();
 
-		await controller.feature(req, 'ad-1');
+		await controller.feature(req, 'ad-1', {});
 
-		expect(service.feature).toHaveBeenCalledWith('u1', 'ad-1');
+		expect(service.feature).toHaveBeenCalledWith(
+			'u1',
+			'USER',
+			'ad-1',
+			undefined,
+		);
 	});
 
 	it('unfeature delega com userId e role', async () => {
@@ -268,22 +282,19 @@ describe('AdsController', () => {
 			).toEqual({ ad: ['edit'] });
 		});
 
-		it('feature exige ad:edit', () => {
+		it('feature e unfeature são acessíveis a qualquer sessão', () => {
 			expect(
 				Reflect.getMetadata(
 					REQUIRED_PERMISSIONS_KEY,
 					AdsController.prototype.feature,
 				),
-			).toEqual({ ad: ['edit'] });
-		});
-
-		it('unfeature exige ad:edit', () => {
+			).toBeUndefined();
 			expect(
 				Reflect.getMetadata(
 					REQUIRED_PERMISSIONS_KEY,
 					AdsController.prototype.unfeature,
 				),
-			).toEqual({ ad: ['edit'] });
+			).toBeUndefined();
 		});
 
 		it('moderate exige ad:moderate', () => {
