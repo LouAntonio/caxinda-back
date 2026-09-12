@@ -23,6 +23,7 @@ import { ResendModule } from './common/resend/resend.module';
 import { KycModule } from './kyc/kyc.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PlansModule } from './plans/plans.module';
+import { PlatformAccountsModule } from './platform-accounts/platform-accounts.module';
 import { ReportsModule } from './reports/reports.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SearchModule } from './search/search.module';
@@ -89,6 +90,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
 		KycModule,
 		PaymentsModule,
 		PlansModule,
+		PlatformAccountsModule,
 		ReportsModule,
 		ReviewsModule,
 		SearchModule,

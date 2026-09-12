@@ -89,7 +89,7 @@ describe('MagicLinkService', () => {
 			const call = (sendMailBridge as jest.Mock).mock.calls[0][0];
 			expect(call.to).toBe('user@example.com');
 			expect(call.html).toContain(
-				'http://localhost:5173/auth/magic?token=raw-token',
+				'http://localhost:5173/auth/verificar?tipo=magic&token=raw-token',
 			);
 		});
 	});

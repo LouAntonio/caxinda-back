@@ -45,14 +45,18 @@ export class CloudinaryService {
 		const config = this.cloudinary.config();
 		const params: SignParams = {
 			...options,
-			api_key: String(config.api_key ?? ''),
 			timestamp: Math.floor(Date.now() / 1000),
 		};
 		const signature = this.cloudinary.utils.api_sign_request(
 			params,
 			config.api_secret ?? '',
 		);
-		return { ...params, signature, cloud_name: config.cloud_name ?? '' };
+		return {
+			...params,
+			api_key: String(config.api_key ?? ''),
+			signature,
+			cloud_name: config.cloud_name ?? '',
+		};
 	}
 
 	deleteResource(
