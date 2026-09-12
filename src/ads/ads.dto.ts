@@ -261,6 +261,14 @@ export class AdQueryDto extends PaginationQueryDto {
 	province?: Province;
 
 	@ApiPropertyOptional({
+		description:
+			'Províncias separadas por vírgula (ex.: LUANDA,BENGUELA) — prioritária sobre province',
+	})
+	@IsOptional()
+	@IsString()
+	provinces?: string;
+
+	@ApiPropertyOptional({
 		description: 'IDs de categoria separados por vírgula (ex.: a,b,c)',
 	})
 	@IsOptional()

@@ -287,11 +287,71 @@ describe('ChatsService', () => {
 			expect(prisma.conversation.create).not.toHaveBeenCalled();
 		});
 
-		it('400 quando SUPPORT tem adId', async () => {
+		it('cria conversa de suporte ligada ao anúncio (SUPPORT + adId)', async () => {
+			prisma.ad.findUnique.mockResolvedValue({ id: 'ad-1' });
+			prisma.conversation.findFirst.mockResolvedValue(null);
+			prisma.conversation.create.mockResolvedValue({
+				id: 'conv-supp-ad',
+			});
+
+			const result = await service.createConversation('user-2', {
+				type: 'SUPPORT' as const,
+				adId: 'ad-1',
+			});
+
+			expect(result.id).toBe('conv-supp-ad');
+			expect(prisma.conversation.findFirst).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.objectContaining({
+						type: 'SUPPORT',
+						adId: 'ad-1',
+					}),
+				}),
+			);
+			expect(prisma.conversation.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					data: expect.objectContaining({
+						type: 'SUPPORT',
+						adId: 'ad-1',
+					}),
+				}),
+			);
+		});
+
+		it('reutiliza conversa de suporte existente do mesmo anúncio', async () => {
+			prisma.ad.findUnique.mockResolvedValue({ id: 'ad-1' });
+			prisma.conversation.findFirst.mockResolvedValue({
+				id: 'conv-supp-ad-existing',
+			});
+
+			const result = await service.createConversation('user-2', {
+				type: 'SUPPORT' as const,
+				adId: 'ad-1',
+			});
+
+			expect(result).toEqual({
+				id: 'conv-supp-ad-existing',
+				created: false,
+			});
+			expect(prisma.conversation.create).not.toHaveBeenCalled();
+		});
+
+		it('404 para SUPPORT com adId de anúncio inexistente', async () => {
+			prisma.ad.findUnique.mockResolvedValue(null);
+
 			await expect(
 				service.createConversation('user-2', {
 					type: 'SUPPORT' as const,
-					adId: 'ad-1',
+					adId: 'non-existent',
+				}),
+			).rejects.toThrow(NotFoundException);
+		});
+
+		it('400 quando SUPPORT tem businessId', async () => {
+			await expect(
+				service.createConversation('user-2', {
+					type: 'SUPPORT' as const,
+					businessId: 'biz-1',
 				}),
 			).rejects.toThrow(BadRequestException);
 		});

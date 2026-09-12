@@ -39,7 +39,7 @@ export class CreateConversationDto {
 	@ApiPropertyOptional({
 		enum: ConversationType,
 		description:
-			'SUPPORT abre conversa com o suporte; AD (padrão) usa adId e BUSINESS usa businessId',
+			'SUPPORT abre conversa com o suporte (opcionalmente sobre um anúncio via adId); AD (padrão) usa adId e BUSINESS usa businessId',
 	})
 	@IsOptional()
 	@IsEnum(ConversationType, { message: 'type inválido' })

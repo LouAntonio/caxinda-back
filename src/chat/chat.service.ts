@@ -89,12 +89,12 @@ export class ChatsService {
 		const isSupport = dto.type === 'SUPPORT';
 
 		if (isSupport) {
-			if (hasAd || hasBusiness) {
+			if (hasBusiness) {
 				throw new BadRequestException(
-					'Uma conversa de suporte não pode ter adId nem businessId.',
+					'Uma conversa de suporte não pode ter businessId.',
 				);
 			}
-			return this.createSupportConversation(userId);
+			return this.createSupportConversation(userId, dto.adId);
 		}
 
 		if (hasAd === hasBusiness) {
@@ -229,14 +229,28 @@ export class ChatsService {
 		});
 	}
 
-	private async createSupportConversation(userId: string): Promise<{
+	private async createSupportConversation(
+		userId: string,
+		adId?: string,
+	): Promise<{
 		id: string;
 		created: boolean;
 	}> {
+		if (adId) {
+			const ad = await this.prisma.ad.findUnique({
+				where: { id: adId },
+				select: { id: true },
+			});
+			if (!ad) {
+				throw new NotFoundException('Anúncio não encontrado.');
+			}
+		}
+
 		const existing = await this.prisma.conversation.findFirst({
 			where: {
 				type: 'SUPPORT',
 				status: { in: ['OPEN', 'IN_PROGRESS'] },
+				adId: adId ?? null,
 				participants: { some: { userId } },
 			},
 			select: { id: true },
@@ -250,6 +264,7 @@ export class ChatsService {
 			data: {
 				id: newId(),
 				type: 'SUPPORT',
+				...(adId && { adId }),
 				participants: {
 					create: [{ id: newId(), userId }],
 				},

@@ -56,4 +56,12 @@ export class GlobalSearchQueryDto extends PaginationQueryDto {
 	@IsOptional()
 	@IsEnum(Province, { message: 'province inválida' })
 	province?: Province;
+
+	@ApiPropertyOptional({
+		description:
+			'Províncias separadas por vírgula (ex.: LUANDA,BENGUELA) — prioritária sobre province',
+	})
+	@IsOptional()
+	@IsString()
+	provinces?: string;
 }

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma, Province } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { buildSearchOR } from '../common/helpers/search.helper';
@@ -52,12 +52,19 @@ export class SearchService {
 		);
 
 		const queries: Promise<GroupedResult>[] = [];
+		const provinces = query.provinces
+			? query.provinces
+					.split(',')
+					.map((p) => p.trim())
+					.filter(Boolean)
+			: [];
 		if (!target || target === 'AD') {
 			queries.push(
 				this.searchAds(
 					q,
 					query.categoryId,
 					query.province,
+					provinces,
 					perEntityTake,
 				),
 			);
@@ -68,6 +75,7 @@ export class SearchService {
 					q,
 					query.categoryId,
 					query.province,
+					provinces,
 					perEntityTake,
 				),
 			);
@@ -114,6 +122,7 @@ export class SearchService {
 		q: string,
 		categoryId: string | undefined,
 		province: string | undefined,
+		provinces: string[],
 		take: number,
 	): Promise<GroupedResult> {
 		const where: Prisma.AdWhereInput = {
@@ -121,9 +130,11 @@ export class SearchService {
 			visibility: 'VISIBLE',
 			...(q ? { OR: buildSearchOR(['title', 'description'], q) } : {}),
 			...(categoryId ? { categories: { some: { id: categoryId } } } : {}),
-			...(province
-				? { province: province as Prisma.AdWhereInput['province'] }
-				: {}),
+			...(provinces.length > 0
+				? { province: { in: provinces as Province[] } }
+				: province
+					? { province: province as Prisma.AdWhereInput['province'] }
+					: {}),
 		};
 
 		const [total, rows] = await Promise.all([
@@ -162,6 +173,7 @@ export class SearchService {
 		q: string,
 		categoryId: string | undefined,
 		province: string | undefined,
+		provinces: string[],
 		take: number,
 	): Promise<GroupedResult> {
 		const where: Prisma.BusinessWhereInput = {
@@ -172,12 +184,14 @@ export class SearchService {
 					}
 				: {}),
 			...(categoryId ? { categoryId } : {}),
-			...(province
-				? {
-						province:
-							province as Prisma.BusinessWhereInput['province'],
-					}
-				: {}),
+			...(provinces.length > 0
+				? { province: { in: provinces as Province[] } }
+				: province
+					? {
+							province:
+								province as Prisma.BusinessWhereInput['province'],
+						}
+					: {}),
 		};
 
 		const [total, rows] = await Promise.all([

@@ -5,7 +5,7 @@ import {
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma, Province } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
 import {
 	buildPagination,
@@ -164,7 +164,15 @@ export class AdsService {
 			}
 		}
 
-		if (query.province) {
+		if (query.provinces) {
+			const provinces = query.provinces
+				.split(',')
+				.map((p) => p.trim())
+				.filter(Boolean) as Province[];
+			if (provinces.length) {
+				where.province = { in: provinces };
+			}
+		} else if (query.province) {
 			where.province = query.province;
 		}
 
