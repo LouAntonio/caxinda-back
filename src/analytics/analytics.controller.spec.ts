@@ -33,6 +33,8 @@ describe('AnalyticsController', () => {
 		getAdStats: jest.Mock;
 		getBusinessStats: jest.Mock;
 		getPlatformStats: jest.Mock;
+		getPlatformOverview: jest.Mock;
+		getPlatformCsv: jest.Mock;
 	};
 
 	const sessionUser = {
@@ -49,6 +51,8 @@ describe('AnalyticsController', () => {
 			getAdStats: jest.fn().mockResolvedValue({}),
 			getBusinessStats: jest.fn().mockResolvedValue({}),
 			getPlatformStats: jest.fn().mockResolvedValue({}),
+			getPlatformOverview: jest.fn().mockResolvedValue({}),
+			getPlatformCsv: jest.fn().mockResolvedValue('date,views'),
 		};
 
 		const moduleRef = await Test.createTestingModule({
@@ -83,12 +87,9 @@ describe('AnalyticsController', () => {
 
 		await controller.adStats(req, 'ad-1', { range: '30d' });
 
-		expect(service.getAdStats).toHaveBeenCalledWith(
-			'u1',
-			'ADMIN',
-			'ad-1',
-			'30d',
-		);
+		expect(service.getAdStats).toHaveBeenCalledWith('u1', 'ADMIN', 'ad-1', {
+			range: '30d',
+		});
 	});
 
 	it('adStats exige sessão', async () => {
@@ -111,14 +112,34 @@ describe('AnalyticsController', () => {
 			'u1',
 			'ADMIN',
 			'biz-1',
-			'7d',
+			{ range: '7d' },
 		);
 	});
 
-	it('platformStats repassa o range', async () => {
+	it('platformStats repassa o query', async () => {
 		await controller.platformStats({ range: '90d' });
 
-		expect(service.getPlatformStats).toHaveBeenCalledWith('90d');
+		expect(service.getPlatformStats).toHaveBeenCalledWith({ range: '90d' });
+	});
+
+	it('platformOverview repassa o query', async () => {
+		await controller.platformOverview({ range: '30d' });
+
+		expect(service.getPlatformOverview).toHaveBeenCalledWith({
+			range: '30d',
+		});
+	});
+
+	it('platformExport devolve o CSV gerado', async () => {
+		const res = {
+			setHeader: jest.fn(),
+			send: jest.fn(),
+		};
+		await controller.platformExport({ range: '30d' }, res as never);
+
+		expect(service.getPlatformCsv).toHaveBeenCalledWith({ range: '30d' });
+		expect(res.setHeader).toHaveBeenCalledTimes(2);
+		expect(res.send).toHaveBeenCalledWith('date,views');
 	});
 
 	it('platformStats exige business:moderate', () => {

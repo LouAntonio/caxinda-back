@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsDateString, IsIn, IsOptional, IsUUID } from 'class-validator';
 
 export const CONTACT_CHANNELS = [
 	'phone',
@@ -21,6 +21,12 @@ export const ANALYTICS_RANGES = [
 
 export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
 
+export interface AnalyticsQuery {
+	range?: AnalyticsRange;
+	from?: string;
+	to?: string;
+}
+
 export class TrackBusinessClickDto {
 	@ApiProperty({ example: '00000000-0000-7000-8000-000000000001' })
 	@IsUUID('7', { message: 'businessId deve ser um UUID' })
@@ -40,4 +46,20 @@ export class AnalyticsRangeDto {
 		message: 'range deve ser 7d, 30d, 90d, 180d, 365d ou 730d',
 	})
 	range: AnalyticsRange = '30d';
+
+	@ApiPropertyOptional({
+		description: 'Data inicial (YYYY-MM-DD)',
+		example: '2026-09-01',
+	})
+	@IsOptional()
+	@IsDateString({}, { message: 'from deve ser uma data ISO 8601 válida' })
+	from?: string;
+
+	@ApiPropertyOptional({
+		description: 'Data final (YYYY-MM-DD)',
+		example: '2026-09-12',
+	})
+	@IsOptional()
+	@IsDateString({}, { message: 'to deve ser uma data ISO 8601 válida' })
+	to?: string;
 }

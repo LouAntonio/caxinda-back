@@ -209,16 +209,21 @@ describe('AdsController', () => {
 		expect(result).toBeUndefined();
 	});
 
-	it('feature resolve a sessão e delega com days', async () => {
+	it('feature resolve a sessão e delega com endDate', async () => {
 		const req = mockRequest();
-		const dto = { days: 7 };
+		const dto = { endDate: '2026-10-15T23:59:59.000Z' };
 
 		await controller.feature(req, 'ad-1', dto);
 
-		expect(service.feature).toHaveBeenCalledWith('u1', 'USER', 'ad-1', 7);
+		expect(service.feature).toHaveBeenCalledWith(
+			'u1',
+			'USER',
+			'ad-1',
+			'2026-10-15T23:59:59.000Z',
+		);
 	});
 
-	it('feature sem days delega com undefined', async () => {
+	it('feature sem endDate delega com undefined', async () => {
 		const req = mockRequest();
 
 		await controller.feature(req, 'ad-1', {});

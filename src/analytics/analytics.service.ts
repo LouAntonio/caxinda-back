@@ -7,7 +7,11 @@ import {
 import Redis from 'ioredis';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { newId } from '../libs/id';
-import { AnalyticsRange, ContactChannel } from './analytics.dto';
+import {
+	AnalyticsQuery,
+	AnalyticsRange,
+	ContactChannel,
+} from './analytics.dto';
 
 export type AnalyticsEntityType = 'AD' | 'BUSINESS';
 
@@ -232,7 +236,7 @@ export class AnalyticsService {
 		userId: string,
 		role: string,
 		adId: string,
-		range: AnalyticsRange = '30d',
+		query: AnalyticsRange | AnalyticsQuery = '30d',
 	) {
 		const ad = await this.prisma.ad.findUnique({
 			where: { id: adId },
@@ -247,8 +251,9 @@ export class AnalyticsService {
 			);
 		}
 
+		const { from, to } = this.resolveDateRange(query);
 		const rows = await this.prisma.analyticsDaily.findMany({
-			where: { adId, date: { gte: this.fromDate(range) } },
+			where: { adId, date: { gte: from, lte: to } },
 			orderBy: { date: 'asc' },
 			select: { date: true, views: true, uniqueViews: true },
 		});
@@ -275,7 +280,7 @@ export class AnalyticsService {
 		userId: string,
 		role: string,
 		businessId: string,
-		range: AnalyticsRange = '30d',
+		query: AnalyticsRange | AnalyticsQuery = '30d',
 	) {
 		const business = await this.prisma.business.findUnique({
 			where: { id: businessId },
@@ -290,8 +295,9 @@ export class AnalyticsService {
 			);
 		}
 
+		const { from, to } = this.resolveDateRange(query);
 		const rows = await this.prisma.analyticsDaily.findMany({
-			where: { businessId, date: { gte: this.fromDate(range) } },
+			where: { businessId, date: { gte: from, lte: to } },
 			orderBy: { date: 'asc' },
 			select: {
 				date: true,
@@ -332,14 +338,16 @@ export class AnalyticsService {
 				date: row.date,
 				views: row.views,
 				uniqueViews: row.uniqueViews,
-				clicks: row.clicks,
+				clicks: this.clicksSum(row.clicks),
+				clicksByChannel: mergeClicks(row.clicks, {}),
 			})),
 		};
 	}
 
-	async getPlatformStats(range: AnalyticsRange = '30d') {
+	async getPlatformStats(query: AnalyticsRange | AnalyticsQuery = '30d') {
+		const { from, to } = this.resolveDateRange(query);
 		const rows = await this.prisma.analyticsDaily.findMany({
-			where: { date: { gte: this.fromDate(range) } },
+			where: { date: { gte: from, lte: to } },
 			orderBy: { date: 'asc' },
 			select: {
 				date: true,
@@ -351,7 +359,12 @@ export class AnalyticsService {
 
 		const byDate = new Map<
 			string,
-			{ views: number; uniqueViews: number }
+			{
+				views: number;
+				uniqueViews: number;
+				clicks: number;
+				clicksByChannel: Map<string, number>;
+			}
 		>();
 		let views = 0;
 		let uniqueViews = 0;
@@ -360,16 +373,27 @@ export class AnalyticsService {
 			views += row.views;
 			uniqueViews += row.uniqueViews;
 			const key = dayKey(row.date);
-			const day = byDate.get(key) ?? { views: 0, uniqueViews: 0 };
+			const day = byDate.get(key) ?? {
+				views: 0,
+				uniqueViews: 0,
+				clicks: 0,
+				clicksByChannel: new Map<string, number>(),
+			};
 			day.views += row.views;
 			day.uniqueViews += row.uniqueViews;
-			byDate.set(key, day);
-			for (const item of mergeClicks(row.clicks, {})) {
+			const rowClicks = mergeClicks(row.clicks, {});
+			day.clicks += this.clicksSum(row.clicks);
+			for (const item of rowClicks) {
+				day.clicksByChannel.set(
+					item.channel,
+					(day.clicksByChannel.get(item.channel) ?? 0) + item.count,
+				);
 				channelTotal.set(
 					item.channel,
 					(channelTotal.get(item.channel) ?? 0) + item.count,
 				);
 			}
+			byDate.set(key, day);
 		}
 
 		return {
@@ -386,14 +410,218 @@ export class AnalyticsService {
 			},
 			daily: [...byDate.entries()].map(([date, totals]) => ({
 				date,
-				...totals,
+				views: totals.views,
+				uniqueViews: totals.uniqueViews,
+				clicks: totals.clicks,
+				clicksByChannel: [...totals.clicksByChannel.entries()].map(
+					([channel, count]) => ({ channel, count }),
+				),
 			})),
 		};
 	}
 
-	private clicksSum(clicks: ClickMap): number {
-		return Object.values(clicks).reduce(
-			(acc, count) => acc + (count ?? 0),
+	async getPlatformOverview(query: AnalyticsRange | AnalyticsQuery = '30d') {
+		const stats = await this.getPlatformStats(query);
+		const { from, to } = this.resolveDateRange(query);
+		const rows = await this.prisma.analyticsDaily.findMany({
+			where: { date: { gte: from, lte: to } },
+			select: { adId: true, businessId: true, views: true, clicks: true },
+		});
+		const ads = new Map<
+			string,
+			{ id: string; views: number; clicks: number }
+		>();
+		const businesses = new Map<
+			string,
+			{ id: string; views: number; clicks: number }
+		>();
+		for (const row of rows) {
+			if (row.adId) {
+				const item = ads.get(row.adId) ?? {
+					id: row.adId,
+					views: 0,
+					clicks: 0,
+				};
+				item.views += row.views;
+				item.clicks += this.clicksSum(row.clicks);
+				ads.set(row.adId, item);
+			}
+			if (row.businessId) {
+				const item = businesses.get(row.businessId) ?? {
+					id: row.businessId,
+					views: 0,
+					clicks: 0,
+				};
+				item.views += row.views;
+				item.clicks += this.clicksSum(row.clicks);
+				businesses.set(row.businessId, item);
+			}
+		}
+		const topAds = [...ads.values()]
+			.sort((a, b) => b.views - a.views)
+			.slice(0, 5);
+		const topBusinesses = [...businesses.values()]
+			.sort((a, b) => b.views - a.views)
+			.slice(0, 5);
+		let adDetails: Array<{
+			id: string;
+			title: string;
+			slug: string;
+			image: string | null;
+		}> = [];
+		let businessDetails: Array<{
+			id: string;
+			name: string;
+			slug: string;
+			coverUrl: string | null;
+		}> = [];
+		if (topAds.length > 0) {
+			adDetails = await this.prisma.ad.findMany({
+				where: { id: { in: topAds.map((item) => item.id) } },
+				select: {
+					id: true,
+					title: true,
+					slug: true,
+					image: true,
+				},
+			});
+		}
+		if (topBusinesses.length > 0) {
+			businessDetails = await this.prisma.business.findMany({
+				where: { id: { in: topBusinesses.map((item) => item.id) } },
+				select: {
+					id: true,
+					name: true,
+					slug: true,
+					coverUrl: true,
+				},
+			});
+		}
+		const adById = new Map(adDetails.map((item) => [item.id, item]));
+		const businessById = new Map(
+			businessDetails.map((item) => [item.id, item]),
+		);
+		const enrichedAds = topAds
+			.map((item) => ({
+				...item,
+				...adById.get(item.id),
+			}))
+			.filter((item): item is typeof item & { title: string } =>
+				Boolean(item.title),
+			);
+		const enrichedBusinesses = topBusinesses
+			.map((item) => ({
+				...item,
+				...businessById.get(item.id),
+			}))
+			.filter((item): item is typeof item & { name: string } =>
+				Boolean(item.name),
+			);
+		return {
+			...stats,
+			topAds: enrichedAds,
+			topBusinesses: enrichedBusinesses,
+		};
+	}
+
+	async getPlatformCsv(query: AnalyticsRange | AnalyticsQuery = '30d') {
+		const stats = await this.getPlatformStats(query);
+		const header = [
+			'date',
+			'views',
+			'uniqueViews',
+			'clicks',
+			'phone',
+			'whatsapp',
+			'email',
+			'website',
+		];
+		const rows = stats.daily.map((day) => {
+			const channels = new Map(
+				day.clicksByChannel.map((item) => [item.channel, item.count]),
+			);
+			return [
+				day.date,
+				day.views,
+				day.uniqueViews,
+				day.clicks,
+				channels.get('phone') ?? 0,
+				channels.get('whatsapp') ?? 0,
+				channels.get('email') ?? 0,
+				channels.get('website') ?? 0,
+			];
+		});
+		return [header, ...rows]
+			.map((row) =>
+				row
+					.map((value) => `"${String(value).replace(/"/g, '""')}"`)
+					.join(','),
+			)
+			.join('\n');
+	}
+
+	private resolveDateRange(query: AnalyticsRange | AnalyticsQuery): {
+		from: Date;
+		to: Date;
+	} {
+		if (typeof query !== 'string' && (query.from || query.to)) {
+			const from = query.from
+				? this.parseDate(query.from, true)
+				: this.fromDate(query.range ?? '30d');
+			const to = query.to
+				? this.parseDate(query.to, false)
+				: this.todayEnd();
+			if (from > to) {
+				throw new BadRequestException(
+					'A data inicial não pode ser posterior à data final.',
+				);
+			}
+			return { from, to };
+		}
+		const range =
+			typeof query === 'string' ? query : (query.range ?? '30d');
+		return { from: this.fromDate(range), to: this.todayEnd() };
+	}
+
+	private parseDate(value: string, endOfDay: boolean): Date {
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) {
+			throw new BadRequestException(
+				'As datas inicial e final devem ser válidas.',
+			);
+		}
+		if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+			date.setUTCHours(
+				endOfDay ? 23 : 0,
+				endOfDay ? 59 : 0,
+				endOfDay ? 59 : 0,
+				endOfDay ? 999 : 0,
+			);
+		}
+		return date;
+	}
+
+	private todayEnd(): Date {
+		const now = new Date();
+		now.setHours(23, 59, 59, 999);
+		return now;
+	}
+
+	private clicksSum(clicks: unknown): number {
+		if (!clicks || typeof clicks !== 'object') {
+			return 0;
+		}
+		if (Array.isArray(clicks)) {
+			return clicks.reduce<number>((acc, item) => {
+				const count = (item as { count?: unknown } | null)?.count;
+				if (typeof count === 'number') {
+					return acc + count;
+				}
+				return acc;
+			}, 0);
+		}
+		return Object.values(clicks).reduce<number>(
+			(acc, count) => acc + (typeof count === 'number' ? count : 0),
 			0,
 		);
 	}

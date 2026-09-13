@@ -154,7 +154,7 @@ export class AdsController {
 		@Body() dto: FeatureAdDto,
 	) {
 		const user = await this.requireUser(req);
-		return this.adsService.feature(user.id, user.role, id, dto.days);
+		return this.adsService.feature(user.id, user.role, id, dto.endDate);
 	}
 
 	@Delete(':id/feature')

@@ -51,6 +51,8 @@ export interface BusinessSessionUser {
 	role: string;
 }
 
+const FEATURED_DURATION_DAYS = 30;
+
 function isUniqueViolation(
 	error: unknown,
 ): error is Prisma.PrismaClientKnownRequestError {
@@ -408,7 +410,7 @@ export class BusinessesService {
 		userId: string,
 		viewerRole: string,
 		businessId: string,
-		days = 30,
+		endDate?: string,
 	) {
 		const privileged = this.isPrivileged({ id: userId, role: viewerRole });
 		const business = await this.prisma.business.findUnique({
@@ -449,9 +451,7 @@ export class BusinessesService {
 		}
 
 		const now = new Date();
-		const featuredUntil = new Date(
-			now.getTime() + days * 24 * 60 * 60 * 1000,
-		);
+		const featuredUntil = this.resolveFeatureDate(endDate);
 
 		const updated = await this.prisma.business.update({
 			where: { id: businessId },
@@ -460,6 +460,32 @@ export class BusinessesService {
 		});
 
 		return this.toPublicBusiness(updated);
+	}
+
+	private resolveFeatureDate(endDate?: string): Date {
+		if (!endDate) {
+			return new Date(
+				Date.now() + FEATURED_DURATION_DAYS * 24 * 60 * 60 * 1000,
+			);
+		}
+		const end = new Date(endDate);
+		if (Number.isNaN(end.getTime())) {
+			throw new BadRequestException('endDate deve ser uma data válida.');
+		}
+		const diffDays = Math.ceil(
+			(end.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
+		);
+		if (diffDays < 1) {
+			throw new BadRequestException(
+				'A data de término do destaque deve estar no futuro.',
+			);
+		}
+		if (diffDays > 90) {
+			throw new BadRequestException(
+				'O destaque não pode exceder 90 dias.',
+			);
+		}
+		return end;
 	}
 
 	async unfeature(userId: string, viewerRole: string, businessId: string) {

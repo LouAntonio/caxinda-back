@@ -176,9 +176,9 @@ describe('BusinessesController', () => {
 		expect(result).toBeUndefined();
 	});
 
-	it('feature repassa userId, role, id e days', async () => {
+	it('feature repassa userId, role, id e endDate', async () => {
 		const req = mockRequest();
-		const dto = { days: 7 };
+		const dto = { endDate: '2026-10-15T23:59:59.000Z' };
 
 		await controller.feature(req, 'biz-1', dto);
 
@@ -186,7 +186,7 @@ describe('BusinessesController', () => {
 			'u1',
 			'PROMOTER',
 			'biz-1',
-			7,
+			'2026-10-15T23:59:59.000Z',
 		);
 	});
 

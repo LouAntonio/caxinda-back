@@ -61,5 +61,17 @@ describe('Analytics DTOs', () => {
 			const errors = await errorsOf(AnalyticsRangeDto, { range: '1y' });
 			expect(errors.some((e) => e.property === 'range')).toBe(true);
 		});
+		it('aceita filtros personalizados from/to', async () => {
+			const errors = await errorsOf(AnalyticsRangeDto, {
+				from: '2026-09-01',
+				to: '2026-09-12',
+			});
+			expect(errors).toEqual([]);
+		});
+
+		it('rejeita data personalizada inválida', async () => {
+			const errors = await errorsOf(AnalyticsRangeDto, { from: 'ontem' });
+			expect(errors.some((e) => e.property === 'from')).toBe(true);
+		});
 	});
 });

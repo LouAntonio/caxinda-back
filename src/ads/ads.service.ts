@@ -443,7 +443,7 @@ export class AdsService {
 		userId: string,
 		viewerRole: string,
 		adId: string,
-		days = FEATURED_DURATION_DAYS,
+		endDate?: string,
 	) {
 		const privileged = this.isPrivileged({ id: userId, role: viewerRole });
 		const ad = await this.prisma.ad.findUnique({
@@ -482,9 +482,7 @@ export class AdsService {
 		}
 
 		const now = new Date();
-		const featuredUntil = new Date(
-			now.getTime() + days * 24 * 60 * 60 * 1000,
-		);
+		const featuredUntil = this.resolveFeatureDate(endDate);
 
 		const updated = await this.prisma.ad.update({
 			where: { id: adId },
@@ -495,6 +493,32 @@ export class AdsService {
 		await this.invalidateAdCache(adId);
 
 		return updated;
+	}
+
+	private resolveFeatureDate(endDate?: string): Date {
+		if (!endDate) {
+			return new Date(
+				Date.now() + FEATURED_DURATION_DAYS * 24 * 60 * 60 * 1000,
+			);
+		}
+		const end = new Date(endDate);
+		if (Number.isNaN(end.getTime())) {
+			throw new BadRequestException('endDate deve ser uma data válida.');
+		}
+		const diffDays = Math.ceil(
+			(end.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
+		);
+		if (diffDays < 1) {
+			throw new BadRequestException(
+				'A data de término do destaque deve estar no futuro.',
+			);
+		}
+		if (diffDays > 90) {
+			throw new BadRequestException(
+				'O destaque não pode exceder 90 dias.',
+			);
+		}
+		return end;
 	}
 
 	private async assertFeatureQuota(userId: string): Promise<void> {

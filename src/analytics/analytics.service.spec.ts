@@ -29,8 +29,16 @@ describe('AnalyticsService', () => {
 		del: jest.Mock;
 	};
 	let prisma: {
-		ad: { findUnique: jest.Mock; updateMany: jest.Mock };
-		business: { findUnique: jest.Mock; updateMany: jest.Mock };
+		ad: {
+			findUnique: jest.Mock;
+			findMany: jest.Mock;
+			updateMany: jest.Mock;
+		};
+		business: {
+			findUnique: jest.Mock;
+			findMany: jest.Mock;
+			updateMany: jest.Mock;
+		};
 		analyticsDaily: {
 			upsert: jest.Mock;
 			findUnique: jest.Mock;
@@ -61,10 +69,12 @@ describe('AnalyticsService', () => {
 		prisma = {
 			ad: {
 				findUnique: jest.fn(),
+				findMany: jest.fn(() => Promise.resolve([])),
 				updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
 			},
 			business: {
 				findUnique: jest.fn(),
+				findMany: jest.fn(() => Promise.resolve([])),
 				updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
 			},
 			analyticsDaily: {
@@ -378,6 +388,80 @@ describe('AnalyticsService', () => {
 				clicksByChannel: [{ channel: 'whatsapp', count: 2 }],
 			});
 			expect(result.daily).toHaveLength(1);
+		});
+	});
+
+	describe('getPlatformOverview', () => {
+		it('devolve o ranking com detalhes de anúncios e empresas', async () => {
+			const date = new Date();
+			prisma.analyticsDaily.findMany.mockResolvedValue([
+				{
+					date,
+					views: 10,
+					uniqueViews: 4,
+					clicks: [{ channel: 'whatsapp', count: 2 }],
+					adId: 'ad-1',
+					businessId: null,
+				},
+				{
+					date,
+					views: 6,
+					uniqueViews: 2,
+					clicks: null,
+					adId: null,
+					businessId: 'biz-1',
+				},
+			]);
+			prisma.ad.findMany.mockResolvedValue([
+				{
+					id: 'ad-1',
+					title: 'Telemóvel',
+					slug: 'telemovel',
+					image: 'https://cdn.test/ad.jpg',
+				},
+			]);
+			prisma.business.findMany.mockResolvedValue([
+				{
+					id: 'biz-1',
+					name: 'Central',
+					slug: 'central',
+					coverUrl: 'https://cdn.test/cover.jpg',
+				},
+			]);
+
+			const result = await service.getPlatformOverview('7d');
+
+			expect(result.totals.views).toBe(16);
+			expect(result.topAds).toHaveLength(1);
+			expect(result.topAds[0]).toEqual({
+				id: 'ad-1',
+				title: 'Telemóvel',
+				slug: 'telemovel',
+				image: 'https://cdn.test/ad.jpg',
+				views: 10,
+				clicks: 2,
+			});
+			expect(result.topBusinesses).toHaveLength(1);
+			expect(result.topBusinesses[0].name).toBe('Central');
+		});
+	});
+
+	describe('getPlatformCsv', () => {
+		it('gera um CSV com totais diários e canais', async () => {
+			prisma.analyticsDaily.findMany.mockResolvedValue([
+				{
+					date: new Date('2026-09-01T12:00:00.000Z'),
+					views: 3,
+					uniqueViews: 2,
+					clicks: [{ channel: 'phone', count: 1 }],
+				},
+			]);
+
+			const csv = await service.getPlatformCsv('30d');
+
+			expect(csv).toContain('"date","views","uniqueViews","clicks"');
+			expect(csv).toContain('"2026-09-01"');
+			expect(csv).toContain('1');
 		});
 	});
 });

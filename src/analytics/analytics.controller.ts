@@ -6,11 +6,12 @@ import {
 	Post,
 	Query,
 	Req,
+	Res,
 	UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
 import { Public } from '../auth/decorators/public.decorator';
@@ -74,7 +75,7 @@ export class AnalyticsController {
 			user.id,
 			user.role,
 			adId,
-			query.range,
+			query,
 		);
 	}
 
@@ -92,7 +93,7 @@ export class AnalyticsController {
 			user.id,
 			user.role,
 			businessId,
-			query.range,
+			query,
 		);
 	}
 
@@ -102,6 +103,36 @@ export class AnalyticsController {
 		summary: 'Estatísticas da plataforma (ADMIN/MODERATOR)',
 	})
 	async platformStats(@Query() query: AnalyticsRangeDto) {
-		return this.analyticsService.getPlatformStats(query.range);
+		return this.analyticsService.getPlatformStats(query);
+	}
+
+	@Get('platform/overview')
+	@RequirePermission({ business: ['moderate'] })
+	@ApiOperation({
+		summary: 'Visão geral da plataforma com itens de topo',
+	})
+	async platformOverview(@Query() query: AnalyticsRangeDto) {
+		return this.analyticsService.getPlatformOverview(query);
+	}
+
+	@Get('platform/export')
+	@RequirePermission({ business: ['moderate'] })
+	@ApiOperation({
+		summary: 'Exportar estatísticas da plataforma em CSV',
+	})
+	async platformExport(
+		@Query() query: AnalyticsRangeDto,
+		@Res() res: Response,
+	) {
+		const csv = await this.analyticsService.getPlatformCsv(query);
+		res.setHeader(
+			'Content-Type',
+			'text/csv; charset=utf-8; header=present',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			`attachment; filename="analiticas-${new Date().toISOString().slice(0, 10)}.csv"`,
+		);
+		res.send(csv);
 	}
 }

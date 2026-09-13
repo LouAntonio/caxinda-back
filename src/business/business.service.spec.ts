@@ -610,7 +610,7 @@ describe('BusinessesService', () => {
 			expect(updateArg.data.featuredAt).toBeInstanceOf(Date);
 		});
 
-		it('usa days quando fornecido', async () => {
+		it('usa endDate quando fornecido', async () => {
 			prisma.business.findUnique.mockResolvedValue(businessRow());
 			prisma.subscription.findFirst.mockResolvedValue({
 				plan: { featuredAdsLimit: 2 },
@@ -621,18 +621,65 @@ describe('BusinessesService', () => {
 			]);
 			prisma.business.update.mockResolvedValue(businessRow());
 
-			await service.feature('owner-1', 'PROMOTER', 'biz-1', 7);
+			const endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+			await service.feature(
+				'owner-1',
+				'PROMOTER',
+				'biz-1',
+				endDate.toISOString(),
+			);
 
 			const updateArg = prisma.business.update.mock.calls[0][0] as {
 				data: { featuredUntil: Date };
 			};
-			const expected = Date.now() + 7 * 24 * 60 * 60 * 1000;
 			expect(updateArg.data.featuredUntil.getTime()).toBeGreaterThan(
-				expected - 1000,
+				endDate.getTime() - 1000,
 			);
 			expect(updateArg.data.featuredUntil.getTime()).toBeLessThanOrEqual(
-				expected + 1000,
+				endDate.getTime() + 1000,
 			);
+		});
+
+		it('lança BadRequest se endDate está no passado', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+			prisma.subscription.findFirst.mockResolvedValue({
+				plan: { featuredAdsLimit: 2 },
+			});
+			prisma.business.count.mockResolvedValue(0);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
+
+			await expect(
+				service.feature(
+					'owner-1',
+					'PROMOTER',
+					'biz-1',
+					new Date(Date.now() - 1000).toISOString(),
+				),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('lança BadRequest se endDate excede 90 dias', async () => {
+			prisma.business.findUnique.mockResolvedValue(businessRow());
+			prisma.subscription.findFirst.mockResolvedValue({
+				plan: { featuredAdsLimit: 2 },
+			});
+			prisma.business.count.mockResolvedValue(0);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
+
+			await expect(
+				service.feature(
+					'owner-1',
+					'PROMOTER',
+					'biz-1',
+					new Date(
+						Date.now() + 91 * 24 * 60 * 60 * 1000,
+					).toISOString(),
+				),
+			).rejects.toThrow(BadRequestException);
 		});
 
 		it('ADMIN pode destacar empresa de outro (ignora quota)', async () => {

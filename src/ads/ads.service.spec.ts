@@ -454,7 +454,7 @@ describe('AdsService', () => {
 			expect(updateArg.data.featuredAt).toBeInstanceOf(Date);
 		});
 
-		it('usa days quando fornecido', async () => {
+		it('usa endDate quando fornecido', async () => {
 			prisma.ad.findUnique.mockResolvedValue(adRow);
 			prisma.ad.count.mockResolvedValue(0);
 			prisma.subscription.findMany.mockResolvedValue([
@@ -462,7 +462,13 @@ describe('AdsService', () => {
 			]);
 			prisma.ad.update.mockResolvedValue({ ...adRow, featured: true });
 
-			await service.feature('owner-id', 'USER', 'ad-1', 7);
+			const endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+			await service.feature(
+				'owner-id',
+				'USER',
+				'ad-1',
+				endDate.toISOString(),
+			);
 
 			const updateArg = prisma.ad.update.mock.calls[0][0] as {
 				where: { id: string };
@@ -472,13 +478,48 @@ describe('AdsService', () => {
 					featuredAt: Date;
 				};
 			};
-			const expected = Date.now() + 7 * 24 * 60 * 60 * 1000;
 			expect(updateArg.data.featuredUntil.getTime()).toBeGreaterThan(
-				expected - 1000,
+				endDate.getTime() - 1000,
 			);
 			expect(updateArg.data.featuredUntil.getTime()).toBeLessThanOrEqual(
-				expected + 1000,
+				endDate.getTime() + 1000,
 			);
+		});
+
+		it('lança BadRequest se endDate está no passado', async () => {
+			prisma.ad.findUnique.mockResolvedValue(adRow);
+			prisma.ad.count.mockResolvedValue(0);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
+
+			await expect(
+				service.feature(
+					'owner-id',
+					'USER',
+					'ad-1',
+					new Date(Date.now() - 1000).toISOString(),
+				),
+			).rejects.toThrow(BadRequestException);
+		});
+
+		it('lança BadRequest se endDate excede 90 dias', async () => {
+			prisma.ad.findUnique.mockResolvedValue(adRow);
+			prisma.ad.count.mockResolvedValue(0);
+			prisma.subscription.findMany.mockResolvedValue([
+				{ plan: { featuredAdsLimit: 2 } },
+			]);
+
+			await expect(
+				service.feature(
+					'owner-id',
+					'USER',
+					'ad-1',
+					new Date(
+						Date.now() + 91 * 24 * 60 * 60 * 1000,
+					).toISOString(),
+				),
+			).rejects.toThrow(BadRequestException);
 		});
 	});
 

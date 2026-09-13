@@ -3,19 +3,17 @@ import {
 	ArrayMaxSize,
 	IsArray,
 	IsBoolean,
+	IsDateString,
 	IsEmail,
 	IsEnum,
 	IsIn,
-	IsInt,
 	IsNotEmpty,
 	IsOptional,
 	IsString,
 	IsUrl,
 	IsUUID,
 	Matches,
-	Max,
 	MaxLength,
-	Min,
 	ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -300,11 +298,12 @@ export class BusinessesQueryDto extends PaginationQueryDto {
 }
 
 export class FeatureBusinessDto {
-	@ApiPropertyOptional({ description: 'Duração do destaque em dias (1-90)' })
+	@ApiPropertyOptional({
+		description:
+			'Data de término do destaque (ISO 8601). Mínimo 1 dia e máximo 90 dias a partir de agora.',
+		example: '2026-10-15T23:59:59.000Z',
+	})
 	@IsOptional()
-	@Type(() => Number)
-	@IsInt({ message: 'days deve ser um inteiro' })
-	@Min(1, { message: 'days deve ser pelo menos 1' })
-	@Max(90, { message: 'days não pode exceder 90' })
-	days?: number;
+	@IsDateString({}, { message: 'endDate deve ser uma data válida' })
+	endDate?: string;
 }

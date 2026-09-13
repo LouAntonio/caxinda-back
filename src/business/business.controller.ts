@@ -128,7 +128,12 @@ export class BusinessesController {
 		@Body() dto: FeatureBusinessDto,
 	) {
 		const user = await this.requireUser(req);
-		return this.businessesService.feature(user.id, user.role, id, dto.days);
+		return this.businessesService.feature(
+			user.id,
+			user.role,
+			id,
+			dto.endDate,
+		);
 	}
 
 	@Delete(':id/feature')
