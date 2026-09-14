@@ -1,0 +1,89 @@
+services:
+  api-blue:
+    container_name: caxinda-api-blue
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: caxinda-api:blue
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+    expose:
+      - "3000"
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "-T", "5", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    volumes:
+      - caxinda-logs:/app/logs
+    networks:
+      - caxiauto-net
+
+  api-green:
+    container_name: caxinda-api-green
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: caxinda-api:green
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+    expose:
+      - "3000"
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "-T", "5", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    volumes:
+      - caxinda-logs:/app/logs
+    networks:
+      - caxiauto-net
+
+  redis:
+    container_name: caxinda-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    expose:
+      - "6379"
+    networks:
+      - caxiauto-net
+
+networks:
+  caxiauto-net:
+    external: true
+    name: caxiauto-net
+
+volumes:
+  redis-data:
+  caxinda-logs:
