@@ -1,3 +1,5 @@
+name: caxinda
+
 services:
   api-blue:
     container_name: caxinda-api-blue
