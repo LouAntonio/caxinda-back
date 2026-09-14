@@ -13,7 +13,6 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
-import { Public } from '../auth/decorators/public.decorator';
 import { RequirePermission } from '../auth/decorators/roles.decorator';
 import {
 	CreateReportDto,
@@ -56,9 +55,9 @@ export class ReportsController {
 	}
 
 	@Get('count')
-	@Public()
+	@RequirePermission({ report: ['list'] })
 	@ApiOperation({
-		summary: 'Contagem de denúncias ativas de um alvo (público)',
+		summary: 'Contagem de denúncias ativas de um alvo (moderador)',
 	})
 	async count(@Query() query: ReportCountQueryDto) {
 		return this.reportsService.count(query);

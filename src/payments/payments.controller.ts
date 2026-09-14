@@ -126,6 +126,14 @@ export class PaymentsController {
 		return this.paymentsService.list(query);
 	}
 
+	@Get('methods')
+	@ApiOperation({
+		summary: 'Contas bancárias ativas da plataforma (autenticado)',
+	})
+	async methods() {
+		return this.paymentsService.methods();
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Detalhe de um pagamento (dono ou admin)' })
 	async getById(@Req() req: Request, @Param('id') id: string) {

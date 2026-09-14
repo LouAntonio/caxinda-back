@@ -21,10 +21,7 @@ export class PlansController {
 
 	@Get()
 	@Public()
-	@ApiOperation({
-		summary:
-			'Listar planos/subscrições ativos e contas bancárias da plataforma',
-	})
+	@ApiOperation({ summary: 'Listar planos/subscrições ativos' })
 	list() {
 		return this.plansService.list();
 	}

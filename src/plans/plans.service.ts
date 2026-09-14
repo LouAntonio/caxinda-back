@@ -22,23 +22,13 @@ export class PlansService {
 	constructor(private readonly prisma: PrismaService) {}
 
 	async list() {
-		const [plans, platformAccounts] = await Promise.all([
-			this.prisma.plan.findMany({
-				where: { isActive: true },
-				orderBy: { price: 'asc' },
-			}),
-			this.prisma.platformBankAccount.findMany({
-				where: { isActive: true },
-			}),
-		]);
+		const plans = await this.prisma.plan.findMany({
+			where: { isActive: true },
+			orderBy: { price: 'asc' },
+		});
 
 		return {
 			plans: plans.map((plan) => this.toPublic(plan)),
-			platformAccounts: platformAccounts.map((account) => ({
-				bankName: account.bankName,
-				bankHolder: account.bankHolder,
-				bankIban: account.bankIban,
-			})),
 		};
 	}
 

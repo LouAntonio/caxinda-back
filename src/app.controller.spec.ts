@@ -19,8 +19,10 @@ describe('AppController', () => {
 			const result = appController.getStatus();
 
 			expect(result.status).toBe('API online');
-			expect(typeof result.uptime).toBe('number');
-			expect(result.uptime).toBeGreaterThanOrEqual(0);
+			expect(typeof result.uptime).toBe('string');
+			expect(result.uptime).toMatch(
+				/^\d+ (dia|dias|hora|horas|minuto|minutos|segundo|segundos)/,
+			);
 			expect(new Date(result.timestamp).getTime()).not.toBeNaN();
 		});
 	});

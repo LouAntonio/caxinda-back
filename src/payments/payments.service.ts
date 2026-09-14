@@ -318,6 +318,18 @@ export class PaymentsService {
 		return fresh ? this.toPublicPayment(fresh) : null;
 	}
 
+	async methods(): Promise<unknown> {
+		const accounts = await this.prisma.platformBankAccount.findMany({
+			where: { isActive: true },
+			select: {
+				bankName: true,
+				bankHolder: true,
+				bankIban: true,
+			},
+		});
+		return accounts;
+	}
+
 	async list(query: PaymentsQueryDto) {
 		await this.expireStaleSubscriptions();
 		const { page, limit, skip, take } = buildPagination(

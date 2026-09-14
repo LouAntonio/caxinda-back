@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { formatUptime, uptimeSeconds } from './libs/time';
 
 export interface AppStatus {
 	status: string;
-	uptime: number;
+	uptime: string;
 	timestamp: string;
 }
 
@@ -11,7 +12,7 @@ export class AppService {
 	getStatus(): AppStatus {
 		return {
 			status: 'API online',
-			uptime: process.uptime(),
+			uptime: formatUptime(uptimeSeconds()),
 			timestamp: new Date().toISOString(),
 		};
 	}
