@@ -6,17 +6,23 @@ import {
 	ValidationPipe,
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { AppModule } from './app.module';
 import { auth } from './libs/auth';
+import { corsOrigins } from './libs/cors';
 import { translateValidationError } from './libs/http-exceptions';
 
 type BetterAuthPath = Record<string, Record<string, unknown> | undefined>;
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule, { bufferLogs: true });
+	const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+		bufferLogs: true,
+	});
+
+	app.set('trust proxy', process.env.TRUST_PROXY ?? '1');
 
 	const logger = app.get<LoggerService>(WINSTON_MODULE_NEST_PROVIDER);
 	app.useLogger(logger);
@@ -24,7 +30,10 @@ async function bootstrap() {
 	app.setGlobalPrefix('api', {
 		exclude: [{ path: '/', method: RequestMethod.GET }],
 	});
-	app.enableCors();
+	app.enableCors({
+		origin: corsOrigins(),
+		credentials: true,
+	});
 
 	app.useGlobalPipes(
 		new ValidationPipe({
