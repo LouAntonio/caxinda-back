@@ -12,6 +12,7 @@ import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
 export const MEDIA_FOLDERS = [
 	'ads',
 	'businesses',
+	'categories',
 	'chat',
 	'kyc',
 	'reports',

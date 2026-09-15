@@ -66,6 +66,7 @@ export class CategoriesService {
 					slug: category.slug,
 					name: category.name,
 					type: category.type,
+					imageUrl: category.imageUrl,
 					adCount: category._count.ads,
 					businessCount: category._count.businesses,
 				}));
@@ -101,14 +102,17 @@ export class CategoriesService {
 		}
 
 		try {
-			return await this.prisma.category.create({
+			const created = await this.prisma.category.create({
 				data: {
 					id: newId(),
 					slug,
 					name: dto.name,
 					type: dto.type ?? 'AD',
+					imageUrl: dto.imageUrl,
 				},
 			});
+			await this.invalidateCache();
+			return created;
 		} catch (error) {
 			if (isUniqueViolation(error)) {
 				throw new ConflictException(
@@ -145,6 +149,7 @@ export class CategoriesService {
 					name: dto.name,
 					slug,
 					type: dto.type,
+					imageUrl: dto.imageUrl,
 				},
 			});
 			await this.invalidateCache();

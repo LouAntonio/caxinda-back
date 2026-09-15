@@ -4,6 +4,7 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsUrl,
 	Matches,
 	MaxLength,
 } from 'class-validator';
@@ -41,6 +42,18 @@ export class CreateCategoryDto {
 			'slug deve conter apenas letras minúsculas, números e hífens sem espaços',
 	})
 	slug?: string;
+
+	@ApiPropertyOptional({
+		example: 'https://res.cloudinary.com/.../categoria.jpg',
+		description: 'URL da imagem da categoria (Cloudinary)',
+	})
+	@IsOptional()
+	@IsUrl(
+		{ require_protocol: true },
+		{ message: 'imageUrl deve ser um URL válido' },
+	)
+	@MaxLength(2048)
+	imageUrl?: string;
 }
 
 export class UpdateCategoryDto {
@@ -69,4 +82,16 @@ export class UpdateCategoryDto {
 		message: 'type deve ser AD ou BUSINESS',
 	})
 	type?: CategoryType;
+
+	@ApiPropertyOptional({
+		example: 'https://res.cloudinary.com/.../categoria.jpg',
+		description: 'URL da imagem da categoria (Cloudinary)',
+	})
+	@IsOptional()
+	@IsUrl(
+		{ require_protocol: true },
+		{ message: 'imageUrl deve ser um URL válido' },
+	)
+	@MaxLength(2048)
+	imageUrl?: string;
 }
