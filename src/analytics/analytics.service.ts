@@ -8,12 +8,22 @@ import Redis from 'ioredis';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { newId } from '../libs/id';
 import {
+	AnalyticsGroupBy,
 	AnalyticsQuery,
 	AnalyticsRange,
+	AnalyticsType,
 	ContactChannel,
 } from './analytics.dto';
+import { Prisma, Province } from '../generated/prisma/client';
 
 export type AnalyticsEntityType = 'AD' | 'BUSINESS';
+
+export interface AnalyticsScope {
+	groupBy?: AnalyticsGroupBy;
+	type?: AnalyticsType;
+	categories?: string[];
+	provinces?: Province[];
+}
 
 export interface AnalyticsSessionUser {
 	id: string;
@@ -70,6 +80,73 @@ function mergeClicks(
 	}));
 }
 
+/** Devolve a chave de agregação (data de início) para uma data 'YYYY-MM-DD'. */
+function bucketKeyFromStr(dateStr: string, groupBy: 'week' | 'month'): string {
+	const [year, month, day] = dateStr.split('-').map(Number);
+	if (groupBy === 'month') {
+		return `${year}-${String(month).padStart(2, '0')}`;
+	}
+	const weekday = new Date(year, month - 1, day).getDay();
+	const offset = weekday === 0 ? -6 : 1 - weekday;
+	const start = new Date(year, month - 1, day + offset);
+	return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+}
+
+interface SeriesRow {
+	date: string;
+	views: number;
+	uniqueViews: number;
+	clicks?: number;
+	clicksByChannel?: Array<{ channel: string; count: number }>;
+}
+
+/** Agrega uma série diária em semanas/meses, mantendo a ordem cronológica. */
+function groupSeries<T extends SeriesRow>(
+	rows: T[],
+	groupBy?: AnalyticsGroupBy,
+): T[] {
+	if (!groupBy || groupBy === 'day') {
+		return rows;
+	}
+	const buckets = new Map<string, T>();
+	for (const row of rows) {
+		const key = bucketKeyFromStr(row.date, groupBy);
+		const existing = buckets.get(key);
+		if (!existing) {
+			buckets.set(key, { ...row, date: key });
+			continue;
+		}
+		existing.views += row.views;
+		existing.uniqueViews += row.uniqueViews;
+		if (
+			typeof existing.clicks === 'number' &&
+			typeof row.clicks === 'number'
+		) {
+			existing.clicks += row.clicks;
+		}
+		if (existing.clicksByChannel && row.clicksByChannel) {
+			const channels = new Map(
+				existing.clicksByChannel.map((item) => [
+					item.channel,
+					item.count,
+				]),
+			);
+			for (const item of row.clicksByChannel) {
+				channels.set(
+					item.channel,
+					(channels.get(item.channel) ?? 0) + item.count,
+				);
+			}
+			existing.clicksByChannel = [...channels.entries()].map(
+				([channel, count]) => ({ channel, count }),
+			);
+		}
+	}
+	return [...buckets.values()].sort((a, b) =>
+		a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
+	);
+}
+
 @Injectable()
 export class AnalyticsService {
 	constructor(
@@ -79,6 +156,121 @@ export class AnalyticsService {
 
 	private isPrivileged(role?: string): boolean {
 		return role === 'ADMIN' || role === 'MODERATOR';
+	}
+
+	private scopeOf(query: AnalyticsRange | AnalyticsQuery): AnalyticsScope {
+		if (typeof query === 'string') {
+			return {};
+		}
+		return {
+			groupBy: query.groupBy,
+			type: query.type,
+			categories: query.categories,
+			provinces: query.provinces,
+		};
+	}
+
+	/**
+	 * Resolve o intervalo e constrói o filtro de pesquisa da plataforma,
+	 * respeitando `type`, `categories` e `provinces`.
+	 */
+	private async platformRange(
+		query: AnalyticsRange | AnalyticsQuery,
+	): Promise<{
+		scope: AnalyticsScope;
+		where: Prisma.AnalyticsDailyWhereInput;
+	}> {
+		const { from, to } = this.resolveDateRange(query);
+		const scope = this.scopeOf(query);
+		const where: Prisma.AnalyticsDailyWhereInput = {
+			date: { gte: from, lte: to },
+		};
+		if (scope.type === 'AD') {
+			where.adId = { not: null };
+		} else if (scope.type === 'BUSINESS') {
+			where.businessId = { not: null };
+		}
+
+		const hasTypeFilters =
+			(scope.type === 'AD' || scope.type === 'BUSINESS') &&
+			((scope.categories?.length ?? 0) > 0 ||
+				(scope.provinces?.length ?? 0) > 0);
+		if (hasTypeFilters) {
+			const ids = (
+				scope.type === 'AD'
+					? await this.prisma.ad.findMany({
+							where: {
+								...(scope.categories?.length
+									? { categoryId: { in: scope.categories } }
+									: {}),
+								...(scope.provinces?.length
+									? { province: { in: scope.provinces } }
+									: {}),
+							},
+							select: { id: true },
+						})
+					: await this.prisma.business.findMany({
+							where: {
+								...(scope.categories?.length
+									? { categoryId: { in: scope.categories } }
+									: {}),
+								...(scope.provinces?.length
+									? { province: { in: scope.provinces } }
+									: {}),
+							},
+							select: { id: true },
+						})
+			).map((entity) => entity.id);
+			if (scope.type === 'AD') {
+				where.adId = { in: ids };
+			} else {
+				where.businessId = { in: ids };
+			}
+		} else if (
+			!scope.type &&
+			((scope.categories?.length ?? 0) > 0 ||
+				(scope.provinces?.length ?? 0) > 0)
+		) {
+			const [ads, businesses] = await Promise.all([
+				this.prisma.ad.findMany({
+					where: {
+						...(scope.categories?.length
+							? { categoryId: { in: scope.categories } }
+							: {}),
+						...(scope.provinces?.length
+							? { province: { in: scope.provinces } }
+							: {}),
+					},
+					select: { id: true },
+				}),
+				this.prisma.business.findMany({
+					where: {
+						...(scope.categories?.length
+							? { categoryId: { in: scope.categories } }
+							: {}),
+						...(scope.provinces?.length
+							? { province: { in: scope.provinces } }
+							: {}),
+					},
+					select: { id: true },
+				}),
+			]);
+			const adIds = ads.map((item) => item.id);
+			const businessIds = businesses.map((item) => item.id);
+			if (adIds.length === 0 && businessIds.length === 0) {
+				where.adId = { in: [] };
+			} else if (adIds.length > 0 && businessIds.length > 0) {
+				where.OR = [
+					{ adId: { in: adIds } },
+					{ businessId: { in: businessIds } },
+				];
+			} else if (adIds.length > 0) {
+				where.adId = { in: adIds };
+			} else {
+				where.businessId = { in: businessIds };
+			}
+		}
+		return { scope, where };
 	}
 
 	/**
@@ -252,6 +444,7 @@ export class AnalyticsService {
 		}
 
 		const { from, to } = this.resolveDateRange(query);
+		const { groupBy } = this.scopeOf(query);
 		const rows = await this.prisma.analyticsDaily.findMany({
 			where: { adId, date: { gte: from, lte: to } },
 			orderBy: { date: 'asc' },
@@ -268,11 +461,14 @@ export class AnalyticsService {
 		return {
 			adId,
 			totals: { views, uniqueViews },
-			daily: rows.map((row) => ({
-				date: row.date,
-				views: row.views,
-				uniqueViews: row.uniqueViews,
-			})),
+			daily: groupSeries(
+				rows.map((row) => ({
+					date: dayKey(row.date),
+					views: row.views,
+					uniqueViews: row.uniqueViews,
+				})),
+				groupBy,
+			),
 		};
 	}
 
@@ -296,6 +492,7 @@ export class AnalyticsService {
 		}
 
 		const { from, to } = this.resolveDateRange(query);
+		const { groupBy } = this.scopeOf(query);
 		const rows = await this.prisma.analyticsDaily.findMany({
 			where: { businessId, date: { gte: from, lte: to } },
 			orderBy: { date: 'asc' },
@@ -334,20 +531,23 @@ export class AnalyticsService {
 					([channel, count]) => ({ channel, count }),
 				),
 			},
-			daily: rows.map((row) => ({
-				date: row.date,
-				views: row.views,
-				uniqueViews: row.uniqueViews,
-				clicks: this.clicksSum(row.clicks),
-				clicksByChannel: mergeClicks(row.clicks, {}),
-			})),
+			daily: groupSeries(
+				rows.map((row) => ({
+					date: dayKey(row.date),
+					views: row.views,
+					uniqueViews: row.uniqueViews,
+					clicks: this.clicksSum(row.clicks),
+					clicksByChannel: mergeClicks(row.clicks, {}),
+				})),
+				groupBy,
+			),
 		};
 	}
 
 	async getPlatformStats(query: AnalyticsRange | AnalyticsQuery = '30d') {
-		const { from, to } = this.resolveDateRange(query);
+		const { scope, where } = await this.platformRange(query);
 		const rows = await this.prisma.analyticsDaily.findMany({
-			where: { date: { gte: from, lte: to } },
+			where,
 			orderBy: { date: 'asc' },
 			select: {
 				date: true,
@@ -408,23 +608,26 @@ export class AnalyticsService {
 					([channel, count]) => ({ channel, count }),
 				),
 			},
-			daily: [...byDate.entries()].map(([date, totals]) => ({
-				date,
-				views: totals.views,
-				uniqueViews: totals.uniqueViews,
-				clicks: totals.clicks,
-				clicksByChannel: [...totals.clicksByChannel.entries()].map(
-					([channel, count]) => ({ channel, count }),
-				),
-			})),
+			daily: groupSeries(
+				[...byDate.entries()].map(([date, totals]) => ({
+					date,
+					views: totals.views,
+					uniqueViews: totals.uniqueViews,
+					clicks: totals.clicks,
+					clicksByChannel: [...totals.clicksByChannel.entries()].map(
+						([channel, count]) => ({ channel, count }),
+					),
+				})),
+				scope.groupBy,
+			),
 		};
 	}
 
 	async getPlatformOverview(query: AnalyticsRange | AnalyticsQuery = '30d') {
 		const stats = await this.getPlatformStats(query);
-		const { from, to } = this.resolveDateRange(query);
+		const { where } = await this.platformRange(query);
 		const rows = await this.prisma.analyticsDaily.findMany({
-			where: { date: { gte: from, lte: to } },
+			where,
 			select: { adId: true, businessId: true, views: true, clicks: true },
 		});
 		const ads = new Map<

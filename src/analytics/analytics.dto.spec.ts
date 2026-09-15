@@ -73,5 +73,60 @@ describe('Analytics DTOs', () => {
 			const errors = await errorsOf(AnalyticsRangeDto, { from: 'ontem' });
 			expect(errors.some((e) => e.property === 'from')).toBe(true);
 		});
+
+		it('aceita groupBy válido', async () => {
+			for (const groupBy of ['day', 'week', 'month']) {
+				const errors = await errorsOf(AnalyticsRangeDto, { groupBy });
+				expect(errors).toEqual([]);
+			}
+		});
+
+		it('rejeita groupBy inválido', async () => {
+			const errors = await errorsOf(AnalyticsRangeDto, {
+				groupBy: 'biweekly',
+			});
+			expect(errors.some((e) => e.property === 'groupBy')).toBe(true);
+		});
+
+		it('aceita type válido', async () => {
+			for (const type of ['AD', 'BUSINESS']) {
+				const errors = await errorsOf(AnalyticsRangeDto, { type });
+				expect(errors).toEqual([]);
+			}
+		});
+
+		it('rejeita type inválido', async () => {
+			const errors = await errorsOf(AnalyticsRangeDto, { type: 'USER' });
+			expect(errors.some((e) => e.property === 'type')).toBe(true);
+		});
+
+		it('transforma categories em lista de UUIDs válidos', async () => {
+			const errors = await errorsOf(AnalyticsRangeDto, {
+				categories:
+					'00000000-0000-7000-8000-00000000000a, 00000000-0000-7000-8000-00000000000b',
+			});
+			expect(errors).toEqual([]);
+		});
+
+		it('rejeita categories com UUID inválido', async () => {
+			const errors = await errorsOf(AnalyticsRangeDto, {
+				categories: 'nao-e-um-uuid',
+			});
+			expect(errors.some((e) => e.property === 'categories')).toBe(true);
+		});
+
+		it('transforma provincias em lista e valida', async () => {
+			const errors = await errorsOf(AnalyticsRangeDto, {
+				provinces: 'LUANDA, BENGO',
+			});
+			expect(errors).toEqual([]);
+		});
+
+		it('rejeita provincia inválida', async () => {
+			const errors = await errorsOf(AnalyticsRangeDto, {
+				provinces: 'LISBOA',
+			});
+			expect(errors.some((e) => e.property === 'provinces')).toBe(true);
+		});
 	});
 });
