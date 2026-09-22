@@ -9,6 +9,9 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { newId } from '../libs/id';
+import { sendMailBridge } from '../libs/mail';
+import { frontUrl } from '../libs/auth-tokens';
+import { renderEmail } from '../email/templates';
 import {
 	CreateReviewDto,
 	RespondReviewDto,
@@ -72,7 +75,7 @@ export class ReviewsService {
 	private async createAdReview(reviewerId: string, dto: CreateReviewDto) {
 		const ad = await this.prisma.ad.findUnique({
 			where: { id: dto.adId },
-			select: { id: true, userId: true },
+			select: { id: true, userId: true, slug: true },
 		});
 		if (!ad) {
 			throw new NotFoundException('Anúncio não encontrado.');
@@ -106,6 +109,30 @@ export class ReviewsService {
 		await this.refreshAdRating(ad.id);
 		await this.refreshTrustScore(ad.userId);
 
+		const owner = await this.prisma.user.findUnique({
+			where: { id: ad.userId },
+			select: { email: true },
+		});
+		if (owner?.email) {
+			await sendMailBridge({
+				to: owner.email,
+				...renderEmail({
+					subject: 'Recebeu uma nova avaliação',
+					greeting: 'Olá,',
+					title: 'Alguém avaliou o seu anúncio',
+					paragraph: [
+						`Avaliação de ${review.rating} estrelas${review.comment ? `: "${review.comment}"` : ''}.`,
+						'Obrigado por manter a confiança na Caxinda Divulga.',
+					],
+					button: {
+						label: 'Ver avaliações',
+						url: frontUrl(`/anuncios/${ad.slug}`),
+					},
+					note: 'Pode responder a esta avaliação dentro da página do anúncio.',
+				}),
+			});
+		}
+
 		return this.toPublicReview(review);
 	}
 
@@ -115,7 +142,7 @@ export class ReviewsService {
 	) {
 		const business = await this.prisma.business.findUnique({
 			where: { id: dto.businessId },
-			select: { id: true, ownerId: true },
+			select: { id: true, ownerId: true, slug: true },
 		});
 		if (!business) {
 			throw new NotFoundException('Empresa não encontrada.');
@@ -152,6 +179,30 @@ export class ReviewsService {
 		});
 
 		await this.refreshTrustScore(business.ownerId);
+
+		const owner = await this.prisma.user.findUnique({
+			where: { id: business.ownerId },
+			select: { email: true },
+		});
+		if (owner?.email) {
+			await sendMailBridge({
+				to: owner.email,
+				...renderEmail({
+					subject: 'Recebeu uma nova avaliação',
+					greeting: 'Olá,',
+					title: 'Alguém avaliou a sua empresa',
+					paragraph: [
+						`Avaliação de ${review.rating} estrelas${review.comment ? `: "${review.comment}"` : ''}.`,
+						'Obrigado por manter a confiança na Caxinda Divulga.',
+					],
+					button: {
+						label: 'Ver avaliações',
+						url: frontUrl(`/empresas/${business.slug}`),
+					},
+					note: 'Pode responder a esta avaliação dentro da página da empresa.',
+				}),
+			});
+		}
 
 		return this.toPublicReview(review);
 	}
@@ -217,6 +268,29 @@ export class ReviewsService {
 			data: { response: dto.response.trim() },
 			include: REVIEW_INCLUDE,
 		});
+
+		const reviewer = await this.prisma.user.findUnique({
+			where: { id: updated.reviewerId },
+			select: { email: true },
+		});
+		if (reviewer?.email) {
+			const link = updated.adId
+				? frontUrl('/admin/anuncios')
+				: frontUrl('/admin/empresas');
+			await sendMailBridge({
+				to: reviewer.email,
+				...renderEmail({
+					subject: 'O dono respondeu à sua avaliação',
+					greeting: 'Olá,',
+					title: 'Recebeu uma resposta à sua avaliação',
+					paragraph: [
+						'O proprietário respondeu à sua avaliação:',
+						`"${updated.response}"`,
+					],
+					button: { label: 'Ver a resposta', url: link },
+				}),
+			});
+		}
 
 		return this.toPublicReview(updated);
 	}

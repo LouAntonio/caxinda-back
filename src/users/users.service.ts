@@ -10,6 +10,7 @@ import type { IncomingHttpHeaders } from 'http';
 import { auth } from '../libs/auth';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { EmailService } from '../email/email.service';
+import { renderEmail } from '../email/templates';
 import { MagicLinkService } from '../auth/magic-link.service';
 import {
 	BanUserDto,
@@ -330,10 +331,15 @@ export class UsersService {
 			if (target.email) {
 				await this.emailService.enqueue({
 					to: target.email,
-					subject: 'Sua conta foi banida',
-					html: `<p>Olá,</p>
-					<p>Sua conta na Caxinda foi banida${dto.reason ? `: ${dto.reason}` : ''}.</p>
-					<p>Caso acredite que isto seja um erro, entre em contato com o suporte.</p>`,
+					...renderEmail({
+						subject: 'Sua conta foi banida',
+						greeting: 'Olá,',
+						title: 'A sua conta foi banida',
+						paragraph: [
+							`Sua conta na Caxinda foi banida${dto.reason ? `: ${dto.reason}` : ''}.`,
+							'Caso acredite que isto seja um erro, entre em contato com o suporte.',
+						],
+					}),
 				});
 			}
 
@@ -362,10 +368,13 @@ export class UsersService {
 			if (target.email) {
 				await this.emailService.enqueue({
 					to: target.email,
-					subject: 'Sua conta foi reativada',
-					html: `<p>Olá,</p>
-					<p>Sua conta na Caxinda foi <strong>reativada</strong>.</p>
-					<p>Você já pode acessar a plataforma normalmente.</p>`,
+					...renderEmail({
+						subject: 'Sua conta foi reativada',
+						greeting: 'Olá,',
+						title: 'A sua conta foi reativada',
+						paragraph:
+							'Sua conta na Caxinda foi reativada. Você já pode acessar a plataforma normalmente.',
+					}),
 				});
 			}
 
@@ -395,10 +404,13 @@ export class UsersService {
 			if (target.email) {
 				await this.emailService.enqueue({
 					to: target.email,
-					subject: 'Seu tipo de acesso foi alterado',
-					html: `<p>Olá,</p>
-					<p>O seu tipo de acesso na Caxinda foi alterado para <strong>${dto.role}</strong>.</p>
-					<p>Se você não reconhece esta alteração, entre em contato com o suporte.</p>`,
+					...renderEmail({
+						subject: 'Seu tipo de acesso foi alterado',
+						greeting: 'Olá,',
+						title: 'O seu tipo de acesso foi alterado',
+						paragraph: `O seu tipo de acesso na Caxinda foi alterado para <strong>${dto.role}</strong>.`,
+						note: 'Se você não reconhece esta alteração, entre em contato com o suporte.',
+					}),
 				});
 			}
 

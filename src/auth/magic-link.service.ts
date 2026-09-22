@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { frontUrl, generateToken, hashToken } from '../libs/auth';
 import { newId } from '../libs/id';
 import { sendMailBridge } from '../libs/mail';
+import { renderEmail } from '../email/templates';
 import { prisma } from '../libs/prisma';
 import { auth } from '../libs/auth';
 
@@ -33,13 +34,16 @@ export class MagicLinkService {
 
 		await sendMailBridge({
 			to: normalized,
-			subject: options?.subject ?? 'Seu link de acesso',
-			html:
-				options?.html?.replace('%LINK%', loginUrl) ??
-				`<p>Olá,</p>
-				<p>Clique no link abaixo para entrar na sua conta (válido por 15 minutos):</p>
-				<p><a href="${loginUrl}">Entrar</a></p>
-				<p>Se você não solicitou, ignore este e-mail.</p>`,
+			...renderEmail({
+				subject: options?.subject ?? 'Seu link de acesso',
+				greeting: 'Olá,',
+				title: 'Entrar na sua conta',
+				paragraph:
+					'Clique no link abaixo para entrar na sua conta (válido por 15 minutos).',
+				button: { label: 'Entrar', url: loginUrl },
+				note: 'Se você não solicitou, ignore este e-mail.',
+				html: options?.html?.replace('%LINK%', loginUrl),
+			}),
 		});
 	}
 

@@ -3,6 +3,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { admin as adminPlugin, bearer, openAPI } from 'better-auth/plugins';
 import { newId } from './id';
 import { sendMailBridge } from './mail';
+import { renderEmail } from '../email/templates';
 import { prisma } from './prisma';
 import { frontUrl } from './auth-tokens';
 import {
@@ -100,11 +101,15 @@ export const auth = betterAuth({
 			);
 			await sendMailBridge({
 				to: user.email,
-				subject: 'Redefinir sua senha',
-				html: `<p>Olá ${user.name},</p>
-					<p>Clique no link abaixo para redefinir sua senha:</p>
-					<p><a href="${resetUrl}">Redefinir senha</a></p>
-					<p>Se você não solicitou, ignore este e-mail.</p>`,
+				...renderEmail({
+					subject: 'Redefinir sua senha',
+					greeting: `Olá ${user.name},`,
+					title: 'Redefinir a sua senha',
+					paragraph:
+						'Clique no link abaixo para redefinir a sua senha.',
+					button: { label: 'Redefinir senha', url: resetUrl },
+					note: 'Se você não solicitou, ignore este e-mail.',
+				}),
 			});
 		},
 	},
@@ -121,10 +126,14 @@ export const auth = betterAuth({
 				: url;
 			await sendMailBridge({
 				to: user.email,
-				subject: 'Verifique seu email',
-				html: `<p>Olá ${user.name},</p>
-					<p>Clique no link abaixo para verificar seu email:</p>
-					<p><a href="${verifyUrl}">Verificar email</a></p>`,
+				...renderEmail({
+					subject: 'Verifique seu email',
+					greeting: `Olá ${user.name},`,
+					title: 'Verifique o seu email',
+					paragraph:
+						'Clique no link abaixo para verificar o seu email.',
+					button: { label: 'Verificar email', url: verifyUrl },
+				}),
 			});
 		},
 	},

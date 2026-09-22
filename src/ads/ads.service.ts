@@ -26,6 +26,8 @@ import {
 } from './ads.dto';
 import { slugify } from '../categories/categories.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { sendMailBridge } from '../libs/mail';
+import { renderEmail } from '../email/templates';
 
 export interface AdSessionUser {
 	id: string;
@@ -719,6 +721,28 @@ export class AdsService {
 			include: AD_INCLUDE,
 		});
 		await this.invalidateAdCache(id);
+
+		const owner = await this.prisma.user.findUnique({
+			where: { id: updated.userId },
+			select: { email: true },
+		});
+		if (owner?.email) {
+			await sendMailBridge({
+				to: owner.email,
+				...renderEmail({
+					subject: updated.verified
+						? 'Anúncio verificado'
+						: 'Anúncio analisado',
+					greeting: 'Olá,',
+					title: 'O seu anúncio foi analisado',
+					paragraph:
+						'O seu anúncio foi analisado por um moderador da Caxinda Divulga.',
+					note: updated.verified
+						? 'O anúncio está agora visível para todos.'
+						: 'Caso pretenda contestar esta decisão, entre em contato com o suporte.',
+				}),
+			});
+		}
 
 		return updated;
 	}

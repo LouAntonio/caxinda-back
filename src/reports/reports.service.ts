@@ -9,6 +9,9 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { newId } from '../libs/id';
+import { sendMailBridge } from '../libs/mail';
+import { frontUrl } from '../libs/auth-tokens';
+import { renderEmail, getAdminEmails } from '../email/templates';
 import {
 	CreateReportDto,
 	ReportCountQueryDto,
@@ -69,6 +72,32 @@ export class ReportsService {
 			},
 			include: REPORT_INCLUDE,
 		});
+
+		const adminEmails = getAdminEmails();
+		if (adminEmails.length) {
+			const targetLabel = await this.resolveTargetLabel(
+				report.targetType,
+				report.targetId,
+			);
+			await sendMailBridge({
+				to: adminEmails.join(','),
+				...renderEmail({
+					subject: 'Nova denúncia',
+					title: 'Foi submetida uma nova denúncia',
+					paragraph: [
+						`Denúncia sobre ${targetLabel ?? report.targetType}.`,
+						`Motivo: ${report.reason}.`,
+						...(report.description
+							? [`Detalhes: ${report.description}`]
+							: []),
+					],
+					button: {
+						label: 'Ver denúncias',
+						url: frontUrl('/admin/denuncias'),
+					},
+				}),
+			});
+		}
 
 		return this.toPublicReport(report);
 	}
@@ -159,11 +188,45 @@ export class ReportsService {
 			throw new NotFoundException('Denúncia não encontrada.');
 		}
 
-		return this.prisma.report.update({
+		const updated = await this.prisma.report.update({
 			where: { id: reportId },
 			data: { status: dto.status },
 			include: REPORT_INCLUDE,
 		});
+
+		if (dto.status === 'RESOLVED' || dto.status === 'DISMISSED') {
+			const reporter = await this.prisma.report.findUnique({
+				where: { id: reportId },
+				select: { reporterId: true },
+			});
+			if (reporter?.reporterId) {
+				const user = await this.prisma.user.findUnique({
+					where: { id: reporter.reporterId },
+					select: { email: true },
+				});
+				if (user?.email) {
+					await sendMailBridge({
+						to: user.email,
+						...renderEmail({
+							subject:
+								dto.status === 'RESOLVED'
+									? 'A sua denúncia foi resolvida'
+									: 'A sua denúncia foi arquivada',
+							greeting: 'Olá,',
+							title:
+								dto.status === 'RESOLVED'
+									? 'A sua denúncia foi resolvida'
+									: 'A sua denúncia foi arquivada',
+							paragraph:
+								'A equipa da Caxinda Divulga tomou uma decisão sobre a sua denúncia.',
+							note: 'Agradecemos a sua contribuição para manter a comunidade segura.',
+						}),
+					});
+				}
+			}
+		}
+
+		return updated;
 	}
 
 	async count(query: ReportCountQueryDto) {

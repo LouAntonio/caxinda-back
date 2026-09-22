@@ -9,6 +9,8 @@ import { Prisma } from '../generated/prisma/client';
 import { newId } from '../libs/id';
 import { EmailService } from '../email/email.service';
 import { MediaService } from '../media/media.service';
+import { frontUrl } from '../libs/auth-tokens';
+import { renderEmail, getAdminEmails } from '../email/templates';
 import { ReviewKycDto, SubmitKycDto } from './kyc.dto';
 
 type KYCStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -75,6 +77,23 @@ export class KycService {
 			await this.prisma.user.update({
 				where: { id: userId },
 				data: { isVerified: false },
+			});
+		}
+
+		const adminEmails = getAdminEmails();
+		if (adminEmails.length) {
+			await this.emailService.enqueue({
+				to: adminEmails.join(','),
+				...renderEmail({
+					subject: 'Nova submissão KYC',
+					title: 'Novo pedido de verificação',
+					paragraph:
+						'Foi submetido um novo pedido de verificação de identidade (KYC), agora em análise por um moderador.',
+					button: {
+						label: 'Ver em análise',
+						url: frontUrl('/admin/kyc'),
+					},
+				}),
 			});
 		}
 
@@ -183,10 +202,15 @@ export class KycService {
 		if (email) {
 			await this.emailService.enqueue({
 				to: email,
-				subject: 'Sua conta foi banida',
-				html: `<p>Olá,</p>
-				<p>Sua conta na Caxinda foi banida${reason ? `: ${reason}` : ''}.</p>
-				<p>Caso acredite que isto seja um erro, entre em contato com o suporte.</p>`,
+				...renderEmail({
+					subject: 'Sua conta foi banida',
+					greeting: 'Olá,',
+					title: 'A sua conta foi banida',
+					paragraph: [
+						`Sua conta na Caxinda foi banida${reason ? `: ${reason}` : ''}.`,
+						'Caso acredite que isto seja um erro, entre em contato com o suporte.',
+					],
+				}),
 			});
 		}
 	}
@@ -250,24 +274,34 @@ export class KycService {
 		if (dto.status === 'APPROVED') {
 			await this.emailService.enqueue({
 				to: email,
-				subject: 'Seu KYC foi aprovado',
-				html: `<p>Olá,</p>
-					<p>A sua verificação de identidade (KYC) foi <strong>aprovada</strong>.</p>
-					<p>Agora a sua conta está verificada.</p>`,
+				...renderEmail({
+					subject: 'Seu KYC foi aprovado',
+					greeting: 'Olá,',
+					title: 'A sua verificação de identidade foi aprovada',
+					paragraph: [
+						'A sua verificação de identidade (KYC) foi <strong>aprovada</strong>.',
+						'Agora a sua conta está verificada e pode interagir na plataforma como promotor.',
+					],
+				}),
 			});
 			return;
 		}
 
 		await this.emailService.enqueue({
 			to: email,
-			subject: 'Seu KYC foi recusado',
-			html: `<p>Olá,</p>
-				<p>A sua verificação de identidade (KYC) foi <strong>recusada</strong>${
-					dto.rejectionReason
-						? ` pelo seguinte motivo: ${dto.rejectionReason}`
-						: ''
-				}.</p>
-				<p>Você pode reenviar os seus documentos a qualquer momento.</p>`,
+			...renderEmail({
+				subject: 'Seu KYC foi recusado',
+				greeting: 'Olá,',
+				title: 'A sua verificação de identidade foi recusada',
+				paragraph: [
+					`A sua verificação de identidade (KYC) foi <strong>recusada</strong>${
+						dto.rejectionReason
+							? ` pelo seguinte motivo: ${dto.rejectionReason}`
+							: ''
+					}.`,
+					'Você pode reenviar os seus documentos a qualquer momento.',
+				],
+			}),
 		});
 	}
 }

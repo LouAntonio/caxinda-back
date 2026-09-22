@@ -12,6 +12,8 @@ import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { PaymentsService } from '../payments/payments.service';
 import { newId } from '../libs/id';
+import { sendMailBridge } from '../libs/mail';
+import { renderEmail } from '../email/templates';
 import { buildSearchOR } from '../common/helpers/search.helper';
 import { slugify } from '../categories/categories.service';
 import {
@@ -345,6 +347,27 @@ export class BusinessesService {
 			},
 			include: BUSINESS_INCLUDE,
 		});
+		const owner = await this.prisma.user.findUnique({
+			where: { id: updated.ownerId },
+			select: { email: true },
+		});
+		if (owner?.email) {
+			await sendMailBridge({
+				to: owner.email,
+				...renderEmail({
+					subject: updated.isVerified
+						? 'Negócio verificado'
+						: 'Negócio ocultado',
+					greeting: 'Olá,',
+					title: 'O seu negócio foi analisado',
+					paragraph: `O seu negócio ${updated.isVerified ? 'foi verificado' : 'foi ocultado'} por um moderador da Caxinda Divulga.`,
+					note: updated.isVerified
+						? 'Está agora visível para todos os utilizadores.'
+						: 'Caso pretenda contestar esta decisão, entre em contato com o suporte.',
+				}),
+			});
+		}
+
 		const [item] = await this.toPublicBusinesses([updated]);
 		return item;
 	}

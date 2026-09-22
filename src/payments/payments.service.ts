@@ -9,6 +9,9 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../common/prisma/prisma.module';
 import { buildPagination, paginate } from '../common/dto/paginated-result.dto';
 import { newId } from '../libs/id';
+import { sendMailBridge } from '../libs/mail';
+import { frontUrl } from '../libs/auth-tokens';
+import { renderEmail, getAdminEmails } from '../email/templates';
 import {
 	CreatePaymentDto,
 	PaymentsQueryDto,
@@ -201,6 +204,31 @@ export class PaymentsService {
 			},
 			include: PAYMENT_INCLUDE,
 		});
+		const adminEmails = getAdminEmails();
+		if (adminEmails.length) {
+			await sendMailBridge({
+				to: adminEmails.join(','),
+				...renderEmail({
+					subject: 'Comprovativo de pagamento em análise',
+					title: 'Novo comprovativo de pagamento',
+					paragraph: [
+						`Foi submetido um comprovativo para o pagamento de ${payment.subscription.plan.name} no valor de ${payment.amount.toString()} AOA.`,
+						'A equipa da Caxinda Divulga irá analisar o comprovativo em breve.',
+					],
+					details: [
+						{
+							label: 'Empresa',
+							value: payment.subscription.business.name,
+						},
+					],
+					button: {
+						label: 'Ver pagamentos',
+						url: frontUrl('/admin/pagamentos'),
+					},
+				}),
+			});
+		}
+
 		return this.toPublicPayment(updated);
 	}
 
@@ -310,6 +338,69 @@ export class PaymentsService {
 			}),
 		]);
 		await this.syncBusinessVisibility(payment.subscription.business.id);
+
+		const ownerId = payment.subscription.business.ownerId;
+		const owner = await this.prisma.user.findUnique({
+			where: { id: ownerId },
+			select: { email: true },
+		});
+		if (owner?.email) {
+			const amount = `${payment.amount.toString()} AOA`;
+			const planName = payment.subscription.plan.name;
+			if (dto.decision === 'APPROVED') {
+				await sendMailBridge({
+					to: owner.email,
+					...renderEmail({
+						subject: 'Pagamento confirmado',
+						greeting: 'Olá,',
+						title: 'O seu pagamento foi aprovado',
+						paragraph: [
+							`O pagamento de ${planName} no valor de ${amount} foi aprovado e a sua subscrição está agora ativa.`,
+						],
+						button: {
+							label: 'Gerir subscrição',
+							url: frontUrl('/admin/pagamentos'),
+						},
+						note: 'Obrigado por utilizar a Caxinda Divulga.',
+					}),
+				});
+			} else if (dto.decision === 'REJECTED') {
+				await sendMailBridge({
+					to: owner.email,
+					...renderEmail({
+						subject: 'Pagamento recusado',
+						greeting: 'Olá,',
+						title: 'O seu pagamento foi recusado',
+						paragraph: [
+							`O pagamento de ${planName} no valor de ${amount} foi recusado.`,
+							...(dto.note ? [`Motivo: ${dto.note}`] : []),
+						],
+						button: {
+							label: 'Ver pagamentos',
+							url: frontUrl('/admin/pagamentos'),
+						},
+						note: 'Se pretende reenviar o comprovativo, submeta-o novamente.',
+					}),
+				});
+			} else {
+				await sendMailBridge({
+					to: owner.email,
+					...renderEmail({
+						subject: 'Comprovativo devolvido',
+						greeting: 'Olá,',
+						title: 'O seu comprovativo foi devolvido',
+						paragraph: [
+							`O comprovativo do pagamento de ${planName} foi devolvido para nova análise.`,
+							'Envie um novo comprovativo para prosseguir com a revisão.',
+						],
+						button: {
+							label: 'Submeter comprovativo',
+							url: frontUrl('/admin/pagamentos'),
+						},
+					}),
+				});
+			}
+		}
 
 		const fresh = await this.prisma.payment.findUnique({
 			where: { id: paymentId },
