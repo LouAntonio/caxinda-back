@@ -75,6 +75,7 @@ describe('PaymentsService', () => {
 			findMany: jest.Mock;
 		};
 		platformBankAccount: { findFirst: jest.Mock };
+		user: { findUnique: jest.Mock };
 		$transaction: jest.Mock;
 	};
 
@@ -105,6 +106,7 @@ describe('PaymentsService', () => {
 				findMany: jest.fn(),
 			},
 			platformBankAccount: { findFirst: jest.fn() },
+			user: { findUnique: jest.fn() },
 			$transaction: jest.fn((tx: Promise<unknown>[]) => Promise.all(tx)),
 		};
 

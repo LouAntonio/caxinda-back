@@ -64,7 +64,11 @@ function renderParagraphs(p: EmailRender['paragraph']): string {
 	return lines.map((l) => `<p>${esc(l)}</p>`).join('');
 }
 
-export function renderEmail(r: EmailRender): { html: string; text: string } {
+export function renderEmail(r: EmailRender): {
+	subject: string;
+	html: string;
+	text: string;
+} {
 	const bodyHtml = r.html ?? renderParagraphs(r.paragraph);
 
 	const html = `<!DOCTYPE html>
@@ -79,8 +83,8 @@ export function renderEmail(r: EmailRender): { html: string; text: string } {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.snow};">
   <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid ${BRAND.divider};">
-      <tr><td style="padding:28px 32px 0;">
-        <img src="${BRAND.logo}" alt="Caxinda Divulga" width="150" height="36" style="display:block;">
+			<tr><td align="left" style="padding:28px 32px 0;text-align:left;">
+				<img src="${BRAND.logo}" alt="Caxinda Divulga" width="150" style="display:block;width:150px;height:auto;max-width:100%;">
       </td></tr>
       <tr><td style="padding:20px 32px 0;border-top:2px solid ${BRAND.accent};">
         ${r.greeting ? `<p style="margin:0;font-size:14px;color:${BRAND.body};">${esc(r.greeting)}</p>` : ''}

@@ -68,6 +68,7 @@ describe('BusinessesService', () => {
 			findFirst: jest.Mock;
 			findMany: jest.Mock;
 		};
+		user: { findUnique: jest.Mock };
 	};
 
 	beforeEach(async () => {
@@ -90,6 +91,7 @@ describe('BusinessesService', () => {
 				findFirst: jest.fn(),
 				findMany: jest.fn().mockResolvedValue([]),
 			},
+			user: { findUnique: jest.fn() },
 		};
 
 		analytics = { trackView: jest.fn() };
