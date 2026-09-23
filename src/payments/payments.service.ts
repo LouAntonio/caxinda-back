@@ -207,7 +207,7 @@ export class PaymentsService {
 		const adminEmails = getAdminEmails();
 		if (adminEmails.length) {
 			await sendMailBridge({
-				to: adminEmails.join(','),
+				to: adminEmails,
 				...renderEmail({
 					subject: 'Comprovativo de pagamento em análise',
 					title: 'Novo comprovativo de pagamento',

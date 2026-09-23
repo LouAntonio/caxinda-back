@@ -83,7 +83,7 @@ export class KycService {
 		const adminEmails = getAdminEmails();
 		if (adminEmails.length) {
 			await this.emailService.enqueue({
-				to: adminEmails.join(','),
+				to: adminEmails,
 				...renderEmail({
 					subject: 'Nova submissão KYC',
 					title: 'Novo pedido de verificação',

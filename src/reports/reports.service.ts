@@ -80,7 +80,7 @@ export class ReportsService {
 				report.targetId,
 			);
 			await sendMailBridge({
-				to: adminEmails.join(','),
+				to: adminEmails,
 				...renderEmail({
 					subject: 'Nova denúncia',
 					title: 'Foi submetida uma nova denúncia',

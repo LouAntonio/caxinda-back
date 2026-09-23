@@ -13,7 +13,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://caxinda-redis:6379
     expose:
       - "3000"
     depends_on:
@@ -47,7 +47,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://caxinda-redis:6379
     expose:
       - "3000"
     depends_on:
