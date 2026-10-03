@@ -48,7 +48,7 @@ export class AuthController {
 	@HttpCode(200)
 	@ApiOperation({
 		summary:
-			'Autenticar com ID token do Google (fluxo sem redirect — popup/one-tap)',
+			'Autenticar com ID token do Google (fluxo sem redirect - popup/one-tap)',
 	})
 	async google(
 		@Body() body: GoogleSignInDto,

@@ -124,9 +124,9 @@ src/
   (reenviado automaticamente em cada tentativa de login enquanto não verificado,
   com `sendOnSignIn`).
 - **Guard global `PermissionsGuard`** (`APP_GUARD`): por omissão qualquer rota exige sessão.
-  - `@Public()` — marca a rota (ou controller) como pública.
-  - `@Roles(Role.ADMIN, ...)` — restringe a funções específicas.
-  - `@Permissions(...)` — verifica permissões (RBAC) via better-auth.
+  - `@Public()` - marca a rota (ou controller) como pública.
+  - `@Roles(Role.ADMIN, ...)` - restringe a funções específicas.
+  - `@Permissions(...)` - verifica permissões (RBAC) via better-auth.
 - A ordem dos guards globais: `ThrottlerGuard` → `PermissionsGuard`.
 
 ## Principais módulos
@@ -150,10 +150,10 @@ O chat mistura **REST** (recomendado para payloads grandes, e.g. mídia) com **S
 
 - REST: `POST /conversations` cria/reusa conversa (`adId`, `businessId` ou `type: SUPPORT`). `GET`, `GET/:id/messages`, `POST/:id/messages`, `POST/:id/read`.
 - Socket.IO (gateway `ChatsGateway`, espaço `conversation/:id`):
-  - `conversation:join` / `conversation:leave` — entrada/saída da sala.
-  - `message:send` — envia mensagem e notifica a sala + `conversation:unread` ao destinatário.
+  - `conversation:join` / `conversation:leave` - entrada/saída da sala.
+  - `message:send` - envia mensagem e notifica a sala + `conversation:unread` ao destinatário.
   - `conversation:read`, `message:typing`, `presence:update`.
-  - `conversation:new-support` — avisa a sala `staff` quando um utilizador cria uma conversa de suporte nova.
+  - `conversation:new-support` - avisa a sala `staff` quando um utilizador cria uma conversa de suporte nova.
 
 ### Fluxo de suporte
 
@@ -173,7 +173,7 @@ O chat mistura **REST** (recomendado para payloads grandes, e.g. mídia) com **S
 ## Paginação e busca
 
 - Paginação padrão em `PaginationQueryDto` (`page`, `limit`, máx. 50; admin de anúncios máx. 100), com helpers `buildPagination`/`paginate` e `totalPages` na resposta.
-- Busca por palavra-chave padronizada com `buildSearchOR(fields, q)` (`contains`, `insensitive`) — usada em anúncios, empresas e avisos do admin.
+- Busca por palavra-chave padronizada com `buildSearchOR(fields, q)` (`contains`, `insensitive`) - usada em anúncios, empresas e avisos do admin.
 - Busca global `GET /search` agrega anúncios (título/descrição), empresas (nome/descrição/telefone) e utilizadores (nome/apelido), ordenados por relevância, com filtros `type`, `categoryId` e `province`.
 
 ## Qualidade e testes

@@ -59,7 +59,7 @@ export class GlobalSearchQueryDto extends PaginationQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			'Províncias separadas por vírgula (ex.: LUANDA,BENGUELA) — prioritária sobre province',
+			'Províncias separadas por vírgula (ex.: LUANDA,BENGUELA) - prioritária sobre province',
 	})
 	@IsOptional()
 	@IsString()

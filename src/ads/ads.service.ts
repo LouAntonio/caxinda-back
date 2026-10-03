@@ -133,7 +133,7 @@ export class AdsService {
 			);
 		}
 
-		// Proximidade (PostGIS) ainda não está ativa — ver prisma/schema.prisma.
+		// Proximidade (PostGIS) ainda não está ativa - ver prisma/schema.prisma.
 		const proximity: null = null;
 
 		const where: Prisma.AdWhereInput = {};
@@ -213,7 +213,7 @@ export class AdsService {
 			// Quando há proximidade, a página deve refletir a ordem por
 			// distância. Buscamos todos os anúncios dentro do raio (e que
 			// cumprem os restantes filtros) e paginamos por distância em
-			// memória — em vez de paginar por createdAt no SQL, o que deixaria
+			// memória - em vez de paginar por createdAt no SQL, o que deixaria
 			// fora anúncios próximos porém mais antigos.
 			const withinRadius = await this.prisma.ad.findMany({
 				where,
@@ -421,7 +421,7 @@ export class AdsService {
 	/** Extrai a localização (lat/lng) de um anúncio, se existir. */
 	private getLocation(id: string): Promise<null> {
 		void id;
-		// PostGIS ainda não está ativo — localização indisponível.
+		// PostGIS ainda não está ativo - localização indisponível.
 		return Promise.resolve(null);
 	}
 
@@ -431,7 +431,7 @@ export class AdsService {
 		return { ...ad, location };
 	}
 
-	/** Distância em metros até o anúncio — indisponível sem PostGIS. */
+	/** Distância em metros até o anúncio - indisponível sem PostGIS. */
 	private distanceTo(
 		id: string,
 		proximity: { lat: number; lng: number },

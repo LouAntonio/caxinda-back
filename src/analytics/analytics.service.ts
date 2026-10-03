@@ -293,7 +293,7 @@ export class AnalyticsService {
 				await this.redis.expire(uniqKey, UNIQUE_SET_TTL_S);
 			}
 		} catch {
-			// Analytics é best-effort — nunca deve quebrar o pedido principal.
+			// Analytics é best-effort - nunca deve quebrar o pedido principal.
 		}
 	}
 

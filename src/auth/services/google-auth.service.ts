@@ -31,7 +31,7 @@ export interface GoogleAuthResult {
  * Autenticação "sem redirect": o SPA captura o ID token do Google (popup /
  * one-tap do Google Identity Services) e envia-o aqui. Este serviço valida a
  * assinatura, liga/associa a conta Google (o better-auth já confia em `google`
- * para account linking) e devolve um token de sessão — equivalente ao fluxo do
+ * para account linking) e devolve um token de sessão - equivalente ao fluxo do
  * magic link (AuthController / magic-link.service).
  */
 @Injectable()
