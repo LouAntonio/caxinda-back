@@ -65,6 +65,40 @@ type AdDetail = Prisma.AdGetPayload<{ include: typeof AD_INCLUDE }>;
 
 const FEATURED_DURATION_DAYS = 30;
 
+/** Janela fixa do ranking "Mais vistos" da homepage. */
+const TRENDING_RANGE = '7d';
+const TRENDING_LIMIT_MAX = 24;
+/** O flush de analytics corre a cada 10 min, por isso 5 min de cache chega. */
+const TRENDING_TTL_MS = 5 * 60_000;
+
+/** Shape público de um anúncio, como devolvido nas listagens. */
+export interface PublicAd {
+	id: string;
+	slug: string;
+	title: string;
+	description: string;
+	price: number | null;
+	status: string;
+	visibility: string;
+	province: string | null;
+	verified: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+	image: string | null;
+	imageId: string | null;
+	gallery: unknown;
+	userId: string;
+	averageRating: number | null;
+	reviewCount: number;
+	featured: boolean;
+	featuredUntil: Date | null;
+	views: number;
+	distanceKm?: number;
+}
+
+/** Anúncio público devolvido pelo ranking "Mais vistos", com o total de views dos 7 dias. */
+export type TrendingAd = PublicAd & { views7d: number };
+
 const AD_INCLUDE = {
 	categories: true,
 	user: {
@@ -246,6 +280,85 @@ export class AdsService {
 			...paginate(items, total, { page, limit }),
 			proximity: proximity ? true : undefined,
 		};
+	}
+
+	/**
+	 * Anúncios mais vistos numa janela móvel de 7 dias, para a homepage.
+	 *
+	 * O ranking vem de `analyticsDaily` (soma de `views` por dia) e não de
+	 * `ad.viewCount`, que é acumulado desde sempre. A janela é calculada por
+	 * `AnalyticsService.fromDate` para coincidir com o que o dono do anúncio
+	 * vê nas suas próprias analytics.
+	 */
+	async trending(limit = 8): Promise<PaginatedResult<TrendingAd>> {
+		const resolvedLimit = Math.min(Math.max(limit, 1), TRENDING_LIMIT_MAX);
+		const cacheKey = `ads:trending:${resolvedLimit}`;
+
+		return this.cache.wrap<PaginatedResult<TrendingAd>>(
+			cacheKey,
+			async () => {
+				const from = this.analytics.fromDate(TRENDING_RANGE);
+
+				const rows = await this.prisma.analyticsDaily.groupBy({
+					by: ['adId'],
+					where: { adId: { not: null }, date: { gte: from } },
+					_sum: { views: true },
+					orderBy: { _sum: { views: 'desc' } },
+					// Sobre-buscamos para que anúncios vendidos ou ocultados
+					// (descartados no passo seguinte) não deixem a lista curta.
+					take: Math.min(resolvedLimit * 3, TRENDING_LIMIT_MAX * 3),
+				});
+
+				const ranked = rows
+					.filter((row) => row.adId !== null)
+					.map((row) => ({
+						adId: row.adId as string,
+						views: row._sum.views ?? 0,
+					}))
+					// O groupBy já devolve ordenado, mas ordenamos aqui para que
+					// o ranking não dependa dessa garantia.
+					.sort((a, b) => b.views - a.views);
+
+				if (ranked.length === 0) {
+					return paginate<TrendingAd>([], 0, {
+						page: 1,
+						limit: resolvedLimit,
+					});
+				}
+
+				const ads = await this.prisma.ad.findMany({
+					where: {
+						id: { in: ranked.map((row) => row.adId) },
+						status: 'ACTIVE',
+						visibility: 'VISIBLE',
+					},
+					include: AD_INCLUDE,
+				});
+
+				const viewsByAd = new Map(
+					ranked.map((row) => [row.adId, row.views]),
+				);
+				const rankByAd = new Map(
+					ranked.map((row, index) => [row.adId, index]),
+				);
+
+				ads.sort(
+					(a, b) =>
+						(rankByAd.get(a.id) ?? 0) - (rankByAd.get(b.id) ?? 0),
+				);
+
+				const items = ads.slice(0, resolvedLimit).map((ad) => ({
+					...this.toPublicAd(ad),
+					views7d: viewsByAd.get(ad.id) ?? 0,
+				}));
+
+				return paginate(items, items.length, {
+					page: 1,
+					limit: resolvedLimit,
+				});
+			},
+			TRENDING_TTL_MS,
+		);
 	}
 
 	async adminList(
@@ -966,7 +1079,7 @@ export class AdsService {
 			viewCount: number;
 		},
 		distanceMeters?: number,
-	) {
+	): PublicAd {
 		return {
 			id: ad.id,
 			slug: ad.slug,

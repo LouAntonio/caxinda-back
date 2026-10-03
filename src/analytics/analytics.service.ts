@@ -829,7 +829,12 @@ export class AnalyticsService {
 		);
 	}
 
-	private fromDate(range: AnalyticsRange): Date {
+	/**
+	 * Início da janela para um range (ex.: '7d' = hoje 00:00 e os 6 dias
+	 * anteriores). Público para que o ranking de anúncios da homepage use
+	 * exactamente a mesma janela que as analytics do dono do anúncio.
+	 */
+	fromDate(range: AnalyticsRange): Date {
 		const days = Number(range.replace('d', ''));
 		const cutoff = new Date();
 		cutoff.setHours(0, 0, 0, 0);

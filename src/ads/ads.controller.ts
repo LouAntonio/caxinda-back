@@ -25,6 +25,7 @@ import {
 	CreateAdDto,
 	FeatureAdDto,
 	ModerateAdDto,
+	TrendingAdsQueryDto,
 	UpdateAdDto,
 	UpdateVisibilityDto,
 } from './ads.dto';
@@ -62,6 +63,15 @@ export class AdsController {
 	async list(@Req() req: Request, @Query() query: AdQueryDto) {
 		const viewer = await this.sessionUser(req);
 		return this.adsService.list(query, viewer);
+	}
+
+	@Get('trending')
+	@Public()
+	@ApiOperation({
+		summary: 'Anúncios mais vistos nos últimos 7 dias (público)',
+	})
+	async trending(@Query() query: TrendingAdsQueryDto) {
+		return this.adsService.trending(query.limit);
 	}
 
 	@Get('admin')

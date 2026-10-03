@@ -35,6 +35,7 @@ describe('AdsService', () => {
 			delete: jest.Mock;
 		};
 		category: { findMany: jest.Mock };
+		analyticsDaily: { groupBy: jest.Mock };
 		user: { findUnique: jest.Mock };
 		subscription: {
 			findMany: jest.Mock;
@@ -62,6 +63,7 @@ describe('AdsService', () => {
 
 	const analytics = {
 		trackView: jest.fn(() => undefined),
+		fromDate: jest.fn(() => new Date('2026-01-01T00:00:00Z')),
 	};
 
 	const adRow = {
@@ -125,6 +127,7 @@ describe('AdsService', () => {
 				delete: jest.fn(),
 			},
 			category: { findMany: jest.fn() },
+			analyticsDaily: { groupBy: jest.fn().mockResolvedValue([]) },
 			user: { findUnique: jest.fn() },
 			subscription: {
 				findMany: jest.fn().mockResolvedValue([]),
@@ -358,6 +361,119 @@ describe('AdsService', () => {
 					orderBy: [{ price: 'asc' }, { createdAt: 'desc' }],
 				}),
 			);
+		});
+	});
+
+	describe('trending', () => {
+		const FROM = new Date('2026-01-01T00:00:00Z');
+
+		function groupRows(...rows: Array<[string | null, number]>) {
+			return rows.map(([adId, views]) => ({
+				adId,
+				_sum: { views },
+			}));
+		}
+
+		it('agrega views dos últimos 7 dias por anúncio', async () => {
+			prisma.analyticsDaily.groupBy.mockResolvedValue(
+				groupRows(['ad-1', 42]),
+			);
+			prisma.ad.findMany.mockResolvedValue([]);
+
+			await service.trending(8);
+
+			expect(analytics.fromDate).toHaveBeenCalledWith('7d');
+			expect(prisma.analyticsDaily.groupBy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					by: ['adId'],
+					where: { adId: { not: null }, date: { gte: FROM } },
+					_sum: { views: true },
+					orderBy: { _sum: { views: 'desc' } },
+				}),
+			);
+		});
+
+		it('devolve apenas anúncios ACTIVE + VISIBLE', async () => {
+			prisma.analyticsDaily.groupBy.mockResolvedValue(
+				groupRows(['ad-1', 10]),
+			);
+			prisma.ad.findMany.mockResolvedValue([{ ...adRow, id: 'ad-1' }]);
+
+			await service.trending(8);
+
+			expect(prisma.ad.findMany).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: {
+						id: { in: ['ad-1'] },
+						status: 'ACTIVE',
+						visibility: 'VISIBLE',
+					},
+				}),
+			);
+		});
+
+		it('ordena pelo ranking e anexa views7d', async () => {
+			prisma.analyticsDaily.groupBy.mockResolvedValue(
+				groupRows(['ad-1', 10], ['ad-2', 90], ['ad-3', 50]),
+			);
+			// A BD devolve por ordem de insertion; o serviço tem de reordenar.
+			prisma.ad.findMany.mockResolvedValue([
+				{ ...adRow, id: 'ad-1' },
+				{ ...adRow, id: 'ad-2' },
+				{ ...adRow, id: 'ad-3' },
+			]);
+
+			const result = await service.trending(8);
+
+			expect(result.items.map((ad) => ad.id)).toEqual([
+				'ad-2',
+				'ad-3',
+				'ad-1',
+			]);
+			expect(result.items.map((ad) => ad.views7d)).toEqual([90, 50, 10]);
+		});
+
+		it('respeita o limite pedido', async () => {
+			prisma.analyticsDaily.groupBy.mockResolvedValue(
+				groupRows(['ad-1', 30], ['ad-2', 20], ['ad-3', 10]),
+			);
+			prisma.ad.findMany.mockResolvedValue([
+				{ ...adRow, id: 'ad-1' },
+				{ ...adRow, id: 'ad-2' },
+				{ ...adRow, id: 'ad-3' },
+			]);
+
+			const result = await service.trending(2);
+
+			expect(result.items).toHaveLength(2);
+			expect(result.limit).toBe(2);
+			expect(result.items.map((ad) => ad.id)).toEqual(['ad-1', 'ad-2']);
+		});
+
+		it('ignora linhas de business (adId null)', async () => {
+			prisma.analyticsDaily.groupBy.mockResolvedValue(
+				groupRows([null, 999], ['ad-1', 5]),
+			);
+			prisma.ad.findMany.mockResolvedValue([{ ...adRow, id: 'ad-1' }]);
+
+			const result = await service.trending(8);
+
+			expect(prisma.ad.findMany).toHaveBeenCalledWith(
+				expect.objectContaining({
+					where: expect.objectContaining({ id: { in: ['ad-1'] } }),
+				}),
+			);
+			expect(result.items.map((ad) => ad.id)).toEqual(['ad-1']);
+		});
+
+		it('devolve lista vazia quando não há views na janela', async () => {
+			prisma.analyticsDaily.groupBy.mockResolvedValue([]);
+
+			const result = await service.trending(8);
+
+			expect(prisma.ad.findMany).not.toHaveBeenCalled();
+			expect(result.items).toEqual([]);
+			expect(result.total).toBe(0);
 		});
 	});
 

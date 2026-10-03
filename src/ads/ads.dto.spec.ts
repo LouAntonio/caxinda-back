@@ -7,6 +7,7 @@ import {
 	ModerateAdDto,
 	UpdateAdDto,
 	UpdateVisibilityDto,
+	TrendingAdsQueryDto,
 } from './ads.dto';
 
 async function errorsOf(dto: new () => object, body: Record<string, unknown>) {
@@ -295,6 +296,44 @@ describe('Ads DTOs', () => {
 			});
 
 			expect(errors).toContain('lng');
+		});
+	});
+
+	describe('TrendingAdsQueryDto', () => {
+		it('aceita query vazia (limit opcional)', async () => {
+			const errors = await errorsOf(TrendingAdsQueryDto, {});
+
+			expect(errors).toEqual([]);
+		});
+
+		it('converte limit a partir de string', async () => {
+			const instance = plainToInstance(TrendingAdsQueryDto, {
+				limit: '12',
+			});
+			const errors = await validate(instance);
+
+			expect(errors).toEqual([]);
+			expect(instance.limit).toBe(12);
+		});
+
+		it('rejeita limit abaixo de 1', async () => {
+			const errors = await errorsOf(TrendingAdsQueryDto, { limit: 0 });
+
+			expect(errors).toContain('limit');
+		});
+
+		it('rejeita limit acima de 24', async () => {
+			const errors = await errorsOf(TrendingAdsQueryDto, { limit: 100 });
+
+			expect(errors).toContain('limit');
+		});
+
+		it('rejeita limit não numérico', async () => {
+			const errors = await errorsOf(TrendingAdsQueryDto, {
+				limit: 'muitos',
+			});
+
+			expect(errors).toContain('limit');
 		});
 	});
 });

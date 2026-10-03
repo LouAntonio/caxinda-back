@@ -6,6 +6,7 @@ import {
 	IsBoolean,
 	IsDateString,
 	IsEnum,
+	IsInt,
 	IsIn,
 	IsNotEmpty,
 	IsNumber,
@@ -352,6 +353,22 @@ export class AdQueryDto extends PaginationQueryDto {
 	@Min(1)
 	@Max(199)
 	radiusKm?: number;
+}
+
+export class TrendingAdsQueryDto {
+	@ApiPropertyOptional({
+		default: 8,
+		minimum: 1,
+		maximum: 24,
+		description:
+			'Número de anúncios a devolver (ranking dos últimos 7 dias)',
+	})
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	@Max(24, { message: 'limit deve ser no máximo 24' })
+	limit?: number;
 }
 
 export class AdProximityQueryDto {
