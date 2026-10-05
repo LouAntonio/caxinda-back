@@ -15,7 +15,9 @@ import type { Request } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../libs/auth';
 import { Public } from '../auth/decorators/public.decorator';
-import { RequirePermission } from '../auth/decorators/roles.decorator';
+import { RequirePermission, Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/roles';
+import { buildPermissionMatrix } from '../auth/permissions';
 import {
 	BanUserDto,
 	CreateUserDto,
@@ -72,6 +74,13 @@ export class UsersController {
 	@ApiOperation({ summary: 'Obter perfil público de um utilizador' })
 	async getPublicProfile(@Param('id') id: string) {
 		return this.usersService.getPublicProfile(id);
+	}
+
+	@Get('permissions')
+	@Roles(Role.ADMIN)
+	@ApiOperation({ summary: 'Matriz de permissões por role (ADMIN)' })
+	permissionMatrix() {
+		return buildPermissionMatrix();
 	}
 
 	@Get(':id')

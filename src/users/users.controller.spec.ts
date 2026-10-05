@@ -1,7 +1,10 @@
 import { Test } from '@nestjs/testing';
 import type { Request } from 'express';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
-import { REQUIRED_PERMISSIONS_KEY } from '../auth/decorators/roles.decorator';
+import {
+	REQUIRED_PERMISSIONS_KEY,
+	REQUIRED_ROLES_KEY,
+} from '../auth/decorators/roles.decorator';
 import { auth } from '../libs/auth';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -160,6 +163,20 @@ describe('UsersController', () => {
 		);
 	});
 
+	it('permissionMatrix devolve a matriz derivada das permissões', () => {
+		const result = controller.permissionMatrix();
+
+		expect(result.roles).toEqual([
+			'USER',
+			'PROMOTER',
+			'MODERATOR',
+			'ADMIN',
+		]);
+		expect(result.resources.length).toBeGreaterThan(0);
+		const admin = result.resources.find((r) => r.resource === 'ad');
+		expect(admin?.roles.ADMIN).toEqual(admin?.actions);
+	});
+
 	describe('metadata de permissões por rota', () => {
 		it('list exige user:list', () => {
 			expect(
@@ -217,6 +234,23 @@ describe('UsersController', () => {
 				Reflect.getMetadata(
 					REQUIRED_PERMISSIONS_KEY,
 					UsersController.prototype.updateMe,
+				),
+			).toBeUndefined();
+		});
+
+		it('permissionMatrix é restrito a ADMIN', () => {
+			expect(
+				Reflect.getMetadata(
+					REQUIRED_ROLES_KEY,
+					UsersController.prototype.permissionMatrix,
+				),
+			).toEqual(['ADMIN']);
+			// Usa @Roles (não @RequirePermission): o catálogo de permissões
+			// não deve ser legível por quem não é ADMIN.
+			expect(
+				Reflect.getMetadata(
+					REQUIRED_PERMISSIONS_KEY,
+					UsersController.prototype.permissionMatrix,
 				),
 			).toBeUndefined();
 		});

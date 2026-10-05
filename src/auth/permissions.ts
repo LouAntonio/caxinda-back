@@ -67,3 +67,58 @@ export const roles: Record<string, Role> = {
 	MODERATOR: moderatorRole,
 	ADMIN: adminRole,
 };
+
+export interface PermissionMatrixResource {
+	/** Recurso (ex.: 'ad', 'category'). */
+	resource: string;
+	/** Todas as acções que o recurso suporta (catálogo). */
+	actions: string[];
+	/** Acções concedidas a cada role; array vazio quando não tem nenhuma. */
+	roles: Record<string, string[]>;
+}
+
+export interface PermissionMatrix {
+	resources: PermissionMatrixResource[];
+	/** Nomes das roles, por ordem crescente de privilégio. */
+	roles: string[];
+	/** Total de acções concedidas por role. */
+	totals: Record<string, number>;
+}
+
+/**
+ * Matriz de permissões de todas as roles, derivada de `ac.statements` e do
+ * `.statements` de cada role. Como é gerada a partir da fonte de verdade,
+ * acompanha automaticamente qualquer alteração em `permissions.ts`.
+ */
+export function buildPermissionMatrix(): PermissionMatrix {
+	const roleNames = Object.keys(roles);
+
+	const resources: PermissionMatrixResource[] = Object.entries(
+		ac.statements,
+	).map(([resource, actions]) => ({
+		resource,
+		actions: [...actions],
+		roles: Object.fromEntries(
+			roleNames.map((name) => [
+				name,
+				[
+					...((
+						roles[name].statements as Record<
+							string,
+							readonly string[] | undefined
+						>
+					)[resource] ?? []),
+				],
+			]),
+		),
+	}));
+
+	const totals = Object.fromEntries(
+		roleNames.map((name) => [
+			name,
+			resources.reduce((sum, row) => sum + row.roles[name].length, 0),
+		]),
+	);
+
+	return { resources, roles: roleNames, totals };
+}
