@@ -85,7 +85,8 @@ export class UpdateCategoryDto {
 
 	@ApiPropertyOptional({
 		example: 'https://res.cloudinary.com/.../categoria.jpg',
-		description: 'URL da imagem da categoria (Cloudinary)',
+		description:
+			'URL da imagem da categoria (Cloudinary). Enviar null remove a imagem actual.',
 	})
 	@IsOptional()
 	@IsUrl(
@@ -93,5 +94,5 @@ export class UpdateCategoryDto {
 		{ message: 'imageUrl deve ser um URL válido' },
 	)
 	@MaxLength(2048)
-	imageUrl?: string;
+	imageUrl?: string | null;
 }

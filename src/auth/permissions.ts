@@ -38,6 +38,7 @@ export const moderatorRole = ac.newRole({
 	upload: ['upload', 'delete'],
 	ad: ['create', 'edit', 'delete', 'moderate'],
 	business: ['create', 'edit', 'delete', 'moderate'],
+	category: ['create', 'edit', 'delete'],
 	user: ['list', 'ban', 'set-role'],
 	review: ['create', 'delete'],
 	report: ['create', 'list', 'moderate'],

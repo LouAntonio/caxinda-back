@@ -64,5 +64,32 @@ describe('Categories DTOs', () => {
 			expect(errors).toHaveLength(1);
 			expect(errors[0].property).toBe('slug');
 		});
+
+		it('aceita imageUrl válida', async () => {
+			const errors = await errorsOf(UpdateCategoryDto, {
+				imageUrl: 'https://res.cloudinary.com/caxinda/categoria.jpg',
+			});
+
+			expect(errors).toEqual([]);
+		});
+
+		// null é o que o painel admin envia ao remover a imagem; sem isto o
+		// @IsUrl rejeitaria o payload com 400.
+		it('aceita imageUrl null para remover a imagem', async () => {
+			const errors = await errorsOf(UpdateCategoryDto, {
+				imageUrl: null,
+			});
+
+			expect(errors).toEqual([]);
+		});
+
+		it('rejeita imageUrl que não é URL', async () => {
+			const errors = await errorsOf(UpdateCategoryDto, {
+				imageUrl: 'nao-e-um-url',
+			});
+
+			expect(errors).toHaveLength(1);
+			expect(errors[0].property).toBe('imageUrl');
+		});
 	});
 });
