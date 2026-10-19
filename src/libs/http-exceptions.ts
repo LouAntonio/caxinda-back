@@ -8,11 +8,34 @@ const AUTH_ERRORS_PT: Record<string, string> = {
 	'Token has expired': 'Este link expirou. Peça um novo.',
 	'Email already exists': 'Este email já está registado.',
 	'User already exists': 'Este utilizador já está registado.',
+	'User already exists.': 'Este utilizador já está registado.',
+	'User already exists. Use another email.':
+		'Este email já está registado. Use outro.',
 	'Password is too short': 'A senha deve ter pelo menos 8 caracteres.',
+	'Password too short': 'A senha deve ter pelo menos 8 caracteres.',
 	'Password is too long': 'A senha é demasiado longa.',
+	'Password too long': 'A senha é demasiado longa.',
 	'Invalid password': 'Senha inválida.',
+	'Invalid email': 'Email inválido.',
 	'Email is not verified': 'Email não verificado.',
+	'Email not verified': 'Email não verificado.',
 	'Email requires verification': 'Confirme o seu email antes de continuar.',
+	'Email is already verified': 'Este email já está verificado.',
+	'Email mismatch': 'O email não corresponde ao da conta.',
+	'User already has a password set':
+		'Esta conta já tem uma palavra-passe definida.',
+	"Verification email isn't enabled":
+		'O envio de emails de verificação não está activo.',
+	'Failed to create session': 'Não foi possível criar a sessão.',
+	'Failed to get session': 'Não foi possível obter a sessão.',
+	'Session is not fresh':
+		'Por segurança, termine a sessão e entre novamente para continuar.',
+	'Invalid user': 'Utilizador inválido.',
+	'Credential account not found':
+		'Esta conta não tem palavra-passe definida.',
+	'Social account already linked': 'Esta conta social já está vinculada.',
+	"You can't unlink your last account":
+		'Não é possível desvincular a única conta.',
 	'A request has already been made to reset this account’s password':
 		'Já foi pedido o redefinição desta senha. Verifique o seu email.',
 	'You cannot reset your password since you signed up with another provider':

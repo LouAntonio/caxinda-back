@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpException } from '@nestjs/common';
+import { ForbiddenException, HttpException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthController } from './auth.controller';
 import { MagicLinkService } from './magic-link.service';
@@ -295,6 +295,37 @@ describe('AuthController', () => {
 				body: { accountId: 'g-id' },
 				headers: { host: 'x' },
 			});
+		});
+	});
+
+	describe('handle (proxy better-auth)', () => {
+		it('blocks the better-auth /admin namespace', async () => {
+			const req = {
+				originalUrl: '/api/auth/admin/set-role',
+				url: '/api/auth/admin/set-role',
+				headers: {},
+			} as never;
+			const res = { json: jest.fn() } as never;
+
+			await expect(controller.handle(req, res)).rejects.toBeInstanceOf(
+				ForbiddenException,
+			);
+		});
+
+		it('forwards regular auth paths to the better-auth handler', async () => {
+			const req = {
+				originalUrl: '/api/auth/sign-in/email',
+				url: '/api/auth/sign-in/email',
+				headers: {},
+			} as never;
+			const res = {
+				json: jest.fn(),
+				status: jest.fn().mockReturnThis(),
+				send: jest.fn(),
+				headersSent: false,
+			} as never;
+
+			await expect(controller.handle(req, res)).resolves.toBeUndefined();
 		});
 	});
 });

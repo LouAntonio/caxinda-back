@@ -55,6 +55,7 @@ export class PermissionsGuard implements CanActivate {
 		if (!session) {
 			throw new UnauthorizedException('Não autenticado');
 		}
+		this.assertNotBanned(session.user);
 		return true;
 	}
 
@@ -71,6 +72,8 @@ export class PermissionsGuard implements CanActivate {
 		if (!session) {
 			throw new UnauthorizedException('Não autenticado');
 		}
+
+		this.assertNotBanned(session.user);
 
 		const userRole = session.user.role as string | undefined;
 
@@ -97,5 +100,15 @@ export class PermissionsGuard implements CanActivate {
 		}
 
 		return true;
+	}
+
+	private assertNotBanned(user: { banned?: boolean | null }) {
+		if (user.banned) {
+			// 401 (em vez de 403) para que o cliente limpe a sessão e seja
+			// encaminhado para o login, onde o better-auth mostra o motivo.
+			throw new UnauthorizedException(
+				'A sua conta está suspensa. Contacte o suporte.',
+			);
+		}
 	}
 }

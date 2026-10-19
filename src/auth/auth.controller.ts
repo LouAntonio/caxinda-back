@@ -2,11 +2,13 @@ import {
 	All,
 	Body,
 	Controller,
+	ForbiddenException,
 	HttpCode,
 	HttpException,
 	Post,
 	Req,
 	Res,
+	UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -129,8 +131,8 @@ export class AuthController {
 		summary: 'Vincular a conta Google ao utilizador autenticado',
 	})
 	async linkGoogle(@Body() body: GoogleSignInDto, @Req() req: Request) {
-		const session = await this.getSessionOrThrow(req);
 		try {
+			const session = await this.getSessionOrThrow(req);
 			const profile = await this.googleAuthService.verifyCredential(
 				body.credential,
 			);
@@ -147,8 +149,8 @@ export class AuthController {
 	@HttpCode(200)
 	@ApiOperation({ summary: 'Definir senha (contas criadas via Google)' })
 	async setPassword(@Body() body: SetPasswordDto, @Req() req: Request) {
-		await this.getSessionOrThrow(req);
 		try {
+			await this.getSessionOrThrow(req);
 			const result = await auth.api.setPassword({
 				body: { newPassword: body.newPassword },
 				headers: fromNodeHeaders(req.headers),
@@ -165,9 +167,9 @@ export class AuthController {
 		summary: 'Desvincular conta Google (exige que exista senha definida)',
 	})
 	async unlinkGoogle(@Req() req: Request) {
-		const session = await this.getSessionOrThrow(req);
-
 		try {
+			const session = await this.getSessionOrThrow(req);
+
 			const accounts = await prisma.account.findMany({
 				where: { userId: session.user.id },
 			});
@@ -208,6 +210,11 @@ export class AuthController {
 		if (!session) {
 			throw new HttpException('Não autenticado', 401);
 		}
+		if (session.user.banned) {
+			throw new UnauthorizedException(
+				'A sua conta está suspensa. Contacte o suporte.',
+			);
+		}
 		return session;
 	}
 
@@ -219,12 +226,31 @@ export class AuthController {
 			typeof (error as { message?: string } | null)?.message === 'string'
 				? (error as { message: string }).message
 				: 'Erro de autenticação';
-		return new HttpException(translateAuthError(raw), 400);
+		const rawStatus = (error as { statusCode?: unknown } | null)
+			?.statusCode;
+		const status =
+			typeof rawStatus === 'number' &&
+			rawStatus >= 400 &&
+			rawStatus <= 599
+				? rawStatus
+				: 400;
+		return new HttpException(translateAuthError(raw), status);
 	}
 
 	@All('{*splat}')
 	async handle(@Req() req: Request, @Res() res: Response): Promise<void> {
-		const send = res.json as (body?: unknown) => void;
+		// Os endpoints do plugin `admin` do better-auth expõem operações
+		// sensíveis (set-role, ban-user, remove-user) e o plugin só exige uma
+		// sessão válida - não valida o cargo do chamador. Como a aplicação usa
+		// as rotas equivalentes do NestJS (com validação de permissões), o
+		// namespace é bloqueado aqui para não permitir escalonamento de
+		// privilégios por essa via.
+		const requestPath = (req.originalUrl ?? req.url ?? '').split('?')[0];
+		if (/\/auth\/admin(?:\/|$)/.test(requestPath)) {
+			throw new ForbiddenException('Recurso não disponível.');
+		}
+
+		const send = res.json.bind(res) as (body?: unknown) => void;
 		res.json = ((body: unknown) => {
 			if (body && typeof body === 'object') {
 				const record = body as Record<string, unknown>;

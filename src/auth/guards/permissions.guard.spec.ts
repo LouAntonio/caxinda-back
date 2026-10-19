@@ -135,4 +135,15 @@ describe('PermissionsGuard', () => {
 			ForbiddenException,
 		);
 	});
+
+	it('throws UnauthorizedException for a banned user', async () => {
+		mockedAuth.api.getSession.mockResolvedValue({
+			user: { id: 'u1', role: 'USER', banned: true },
+		});
+		const ctx = mockContext({});
+
+		await expect(guard.canActivate(ctx)).rejects.toThrow(
+			UnauthorizedException,
+		);
+	});
 });

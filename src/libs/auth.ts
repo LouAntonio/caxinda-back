@@ -93,11 +93,9 @@ export const auth = betterAuth({
 	emailAndPassword: {
 		enabled: true,
 		requireEmailVerification: true,
-		sendResetPassword: async ({ user, url }) => {
-			const token =
-				url.split('/reset-password/')[1]?.split('?')[0] ?? url;
+		sendResetPassword: async ({ user, token }) => {
 			const resetUrl = frontUrl(
-				`/redefinir-senha?token=${encodeURIComponent(token)}`,
+				`/auth/redefinir?token=${encodeURIComponent(token)}`,
 			);
 			await sendMailBridge({
 				to: user.email,
@@ -115,15 +113,10 @@ export const auth = betterAuth({
 	},
 	emailVerification: {
 		sendOnSignIn: true,
-		sendVerificationEmail: async ({ user, url }) => {
-			const token =
-				url.split('/verify-email?')[1]?.split('&')[0]?.split('=')[1] ??
-				url;
-			const verifyUrl = token
-				? frontUrl(
-						`/auth/verificar?tipo=email&token=${encodeURIComponent(token)}`,
-					)
-				: url;
+		sendVerificationEmail: async ({ user, token }) => {
+			const verifyUrl = frontUrl(
+				`/auth/verificar?tipo=email&token=${encodeURIComponent(token)}`,
+			);
 			await sendMailBridge({
 				to: user.email,
 				...renderEmail({

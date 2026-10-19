@@ -60,6 +60,9 @@ describe('MagicLinkService', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		(prisma.verification.deleteMany as jest.Mock).mockResolvedValue({
+			count: 1,
+		});
 		service = new MagicLinkService();
 	});
 
@@ -91,6 +94,17 @@ describe('MagicLinkService', () => {
 			expect(call.html).toContain(
 				'http://localhost:5173/auth/verificar?tipo=magic&amp;token=raw-token',
 			);
+		});
+
+		it('does not send another email while the cooldown is active', async () => {
+			(prisma.verification.findFirst as jest.Mock).mockResolvedValue({
+				id: 'cooldown-id',
+			});
+
+			await service.request('user@example.com');
+
+			expect(prisma.verification.create).not.toHaveBeenCalled();
+			expect(sendMailBridge).not.toHaveBeenCalled();
 		});
 	});
 
@@ -163,8 +177,54 @@ describe('MagicLinkService', () => {
 			});
 			expect(result).toEqual({
 				sessionToken: 'session-token',
+				isNewUser: true,
 				user: createdUser,
 			});
+		});
+
+		it('throws UnauthorizedException when the token was already consumed', async () => {
+			const verification = {
+				id: 'ver-id',
+				identifier: 'magic-link:h',
+				value: 'new@example.com',
+				expiresAt: new Date(Date.now() + 60_000),
+			};
+			(prisma.verification.findFirst as jest.Mock).mockResolvedValue(
+				verification,
+			);
+			(prisma.verification.deleteMany as jest.Mock).mockResolvedValue({
+				count: 0,
+			});
+
+			await expect(service.verify('valid-token')).rejects.toThrow(
+				UnauthorizedException,
+			);
+			expect(createSessionMock).not.toHaveBeenCalled();
+		});
+
+		it('throws UnauthorizedException for a banned user', async () => {
+			const verification = {
+				id: 'ver-id',
+				identifier: 'magic-link:h',
+				value: 'banned@example.com',
+				expiresAt: new Date(Date.now() + 60_000),
+			};
+			(prisma.verification.findFirst as jest.Mock).mockResolvedValue(
+				verification,
+			);
+			(prisma.user.findFirst as jest.Mock).mockResolvedValue({
+				id: 'banned-id',
+				name: 'banned',
+				email: 'banned@example.com',
+				emailVerified: true,
+				image: null,
+				banned: true,
+			});
+
+			await expect(service.verify('valid-token')).rejects.toThrow(
+				UnauthorizedException,
+			);
+			expect(createSessionMock).not.toHaveBeenCalled();
 		});
 
 		it('reuses an existing user and sanitizes the returned user', async () => {

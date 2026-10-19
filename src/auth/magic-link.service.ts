@@ -18,6 +18,24 @@ export class MagicLinkService {
 		const normalized = email.trim().toLowerCase();
 		const token = generateToken();
 		const ttlMs = Number(process.env.MAGIC_LINK_TTL_MS ?? 15 * 60 * 1000);
+		const cooldownMs = Number(
+			process.env.MAGIC_LINK_COOLDOWN_MS ?? 60 * 1000,
+		);
+		const cooldownKey = `magic-link:cooldown:${hashToken(normalized)}`;
+
+		// Evita que o mesmo email receba vários links em sequência (spam /
+		// abuso do formulário). A resposta continua a ser silenciosa para não
+		// revelar se o email existe.
+		const recent = await prisma.verification.findFirst({
+			where: {
+				identifier: cooldownKey,
+				expiresAt: { gt: new Date() },
+			},
+			select: { id: true },
+		});
+		if (recent) {
+			return;
+		}
 
 		await prisma.verification.create({
 			data: {
@@ -45,11 +63,22 @@ export class MagicLinkService {
 				html: options?.html?.replace('%LINK%', loginUrl),
 			}),
 		});
+
+		await prisma.verification.create({
+			data: {
+				id: newId(),
+				identifier: cooldownKey,
+				value: normalized,
+				expiresAt: new Date(Date.now() + cooldownMs),
+			},
+		});
 	}
 
-	async verify(
-		token: string,
-	): Promise<{ sessionToken: string; user: unknown }> {
+	async verify(token: string): Promise<{
+		sessionToken: string;
+		isNewUser: boolean;
+		user: unknown;
+	}> {
 		const identifier = `magic-link:${hashToken(token)}`;
 
 		const verification = await prisma.verification.findFirst({
@@ -70,9 +99,19 @@ export class MagicLinkService {
 			throw new UnauthorizedException('Token de acesso expirado');
 		}
 
+		// Consome o token de forma atómica: duas verificações simultâneas do
+		// mesmo link não podem ambas criar sessão.
+		const consumed = await prisma.verification.deleteMany({
+			where: { id: verification.id },
+		});
+		if (consumed.count !== 1) {
+			throw new UnauthorizedException('Token de acesso inválido');
+		}
+
 		const email = verification.value;
 
 		let user = await prisma.user.findFirst({ where: { email } });
+		let isNewUser = false;
 
 		if (!user) {
 			user = await prisma.user.create({
@@ -84,6 +123,7 @@ export class MagicLinkService {
 					emailVerified: true,
 				},
 			});
+			isNewUser = true;
 		} else if (!user.emailVerified) {
 			user = await prisma.user.update({
 				where: { id: user.id },
@@ -91,9 +131,11 @@ export class MagicLinkService {
 			});
 		}
 
-		await prisma.verification.deleteMany({
-			where: { id: verification.id },
-		});
+		if (user.banned) {
+			throw new UnauthorizedException(
+				'A sua conta está suspensa. Contacte o suporte.',
+			);
+		}
 
 		const ctx = await auth.$context;
 		const session = await ctx.internalAdapter.createSession(user.id);
@@ -103,6 +145,7 @@ export class MagicLinkService {
 
 		return {
 			sessionToken: session.token,
+			isNewUser,
 			user: this.toSafeUser(user),
 		};
 	}
@@ -113,6 +156,7 @@ export class MagicLinkService {
 		name: string;
 		emailVerified: boolean;
 		image: string | null;
+		role: string | null;
 	}): unknown {
 		return {
 			id: user.id,
@@ -120,6 +164,7 @@ export class MagicLinkService {
 			name: user.name,
 			emailVerified: user.emailVerified,
 			image: user.image,
+			role: user.role,
 		};
 	}
 }

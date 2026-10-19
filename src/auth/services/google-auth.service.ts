@@ -17,6 +17,7 @@ export interface GoogleAuthProfile {
 
 export interface GoogleAuthResult {
 	sessionToken: string;
+	isNewUser: boolean;
 	user: {
 		id: string;
 		email: string;
@@ -44,7 +45,13 @@ export class GoogleAuthService {
 
 	async authenticate(credential: string): Promise<GoogleAuthResult> {
 		const profile = await this.verifyCredential(credential);
-		const user = await this.linkAccount(profile);
+		const { user, isNewUser } = await this.linkAccount(profile);
+
+		if (user.banned) {
+			throw new UnauthorizedException(
+				'A sua conta está suspensa. Contacte o suporte.',
+			);
+		}
 
 		const ctx = await auth.$context;
 		const session = await ctx.internalAdapter.createSession(user.id);
@@ -54,6 +61,7 @@ export class GoogleAuthService {
 
 		return {
 			sessionToken: session.token,
+			isNewUser,
 			user: {
 				id: user.id,
 				email: user.email,
@@ -148,6 +156,8 @@ export class GoogleAuthService {
 	}
 
 	private async linkAccount(profile: GoogleAuthProfile) {
+		const email = profile.email.trim().toLowerCase();
+
 		const existing = await prisma.account.findUnique({
 			where: {
 				providerId_accountId: {
@@ -158,29 +168,41 @@ export class GoogleAuthService {
 		});
 
 		if (existing) {
-			return prisma.user.update({
+			const user = await prisma.user.update({
 				where: { id: existing.userId },
 				data: { lastLoginAt: new Date() },
 			});
+			return { user, isNewUser: false };
 		}
 
 		let user = await prisma.user.findUnique({
-			where: { email: profile.email },
+			where: { email },
 		});
+
+		// Associar automaticamente a uma conta já existente só é seguro se o
+		// Google confirmar a posse do email; caso contrário seria possível
+		// apropriarmo-nos de uma conta alheia.
+		if (user && !profile.emailVerified) {
+			throw new UnauthorizedException(
+				'O email da conta Google não está verificado.',
+			);
+		}
+
+		let isNewUser = false;
 
 		if (!user) {
 			user = await prisma.user.create({
 				data: {
 					id: newId(),
 					name:
-						profile.name?.trim() ||
-						(profile.email.split('@')[0] ?? profile.email),
+						profile.name?.trim() || (email.split('@')[0] ?? email),
 					surname: '',
-					email: profile.email,
+					email,
 					emailVerified: profile.emailVerified,
 					image: profile.picture,
 				},
 			});
+			isNewUser = true;
 		} else {
 			const data: {
 				emailVerified?: boolean;
@@ -203,17 +225,40 @@ export class GoogleAuthService {
 			});
 		}
 
-		await prisma.account.create({
-			data: {
-				id: newId(),
-				issuer: GOOGLE_ISSUER,
-				accountId: profile.id,
-				providerId: GOOGLE_PROVIDER,
-				userId: user.id,
-			},
-			select: { id: true },
-		});
+		try {
+			await prisma.account.create({
+				data: {
+					id: newId(),
+					issuer: GOOGLE_ISSUER,
+					accountId: profile.id,
+					providerId: GOOGLE_PROVIDER,
+					userId: user.id,
+				},
+				select: { id: true },
+			});
+		} catch (error) {
+			// Duas autenticações simultâneas podem tentar criar a mesma
+			// associação; nesse caso reutilizamos a que já existe.
+			if ((error as { code?: string } | null)?.code === 'P2002') {
+				const linked = await prisma.account.findUnique({
+					where: {
+						providerId_accountId: {
+							providerId: GOOGLE_PROVIDER,
+							accountId: profile.id,
+						},
+					},
+				});
+				if (linked) {
+					const linkedUser = await prisma.user.update({
+						where: { id: linked.userId },
+						data: { lastLoginAt: new Date() },
+					});
+					return { user: linkedUser, isNewUser: false };
+				}
+			}
+			throw error;
+		}
 
-		return user;
+		return { user, isNewUser };
 	}
 }
