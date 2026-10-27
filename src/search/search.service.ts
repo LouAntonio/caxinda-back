@@ -46,10 +46,7 @@ export class SearchService {
 		const pagination = buildPagination(query.page, query.limit);
 		const q = query.q.trim();
 		const target = query.type;
-		const perEntityTake = Math.min(
-			pagination.skip + pagination.take,
-			MAX_PER_ENTITY,
-		);
+		const perEntityTake = MAX_PER_ENTITY;
 
 		const queries: Promise<GroupedResult>[] = [];
 		const provinces = query.provinces

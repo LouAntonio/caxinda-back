@@ -235,7 +235,7 @@ describe('KycService', () => {
 			expect(result.status).toBe('REJECTED');
 			expect(prisma.user.update).toHaveBeenCalledWith({
 				where: { id: 'user-id' },
-				data: { isVerified: false, role: 'USER' },
+				data: { isVerified: false },
 			});
 			expect(emailService.enqueue).toHaveBeenCalledWith(
 				expect.objectContaining({ subject: 'Seu KYC foi recusado' }),

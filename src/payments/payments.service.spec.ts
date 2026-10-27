@@ -58,6 +58,7 @@ describe('PaymentsService', () => {
 			findMany: jest.Mock;
 			update: jest.Mock;
 			updateMany: jest.Mock;
+			count: jest.Mock;
 		};
 		plan: { findUnique: jest.Mock };
 		subscription: {
@@ -89,6 +90,7 @@ describe('PaymentsService', () => {
 				findMany: jest.fn().mockResolvedValue([]),
 				update: jest.fn(),
 				updateMany: jest.fn(),
+				count: jest.fn(),
 			},
 			plan: { findUnique: jest.fn() },
 			subscription: {
@@ -135,6 +137,7 @@ describe('PaymentsService', () => {
 				isActive: true,
 			});
 			prisma.subscription.findFirst.mockResolvedValue(null);
+			prisma.business.count.mockResolvedValue(0);
 			prisma.subscription.count.mockResolvedValue(0);
 			prisma.subscription.create.mockResolvedValue({ id: 'sub-1' });
 			prisma.platformBankAccount.findFirst.mockResolvedValue({
@@ -176,6 +179,7 @@ describe('PaymentsService', () => {
 				isActive: true,
 			});
 			prisma.subscription.findFirst.mockResolvedValueOnce(null);
+			prisma.business.count.mockResolvedValue(0);
 			prisma.subscription.findFirst.mockResolvedValueOnce({
 				id: 'sub-existing',
 			});
@@ -278,7 +282,7 @@ describe('PaymentsService', () => {
 				isActive: true,
 			});
 			prisma.subscription.findFirst.mockResolvedValueOnce(null);
-			prisma.subscription.count.mockResolvedValue(1);
+			prisma.business.count.mockResolvedValue(1);
 
 			await expect(
 				service.create(owner.id, owner.role, {
@@ -300,6 +304,7 @@ describe('PaymentsService', () => {
 				isActive: true,
 			});
 			prisma.subscription.findFirst.mockResolvedValue(null);
+			prisma.business.count.mockResolvedValue(0);
 			prisma.subscription.count.mockResolvedValue(0);
 			prisma.subscription.create.mockResolvedValue({ id: 'sub-1' });
 			prisma.platformBankAccount.findFirst.mockResolvedValue(null);

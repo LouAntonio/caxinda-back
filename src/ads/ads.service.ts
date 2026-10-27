@@ -148,7 +148,8 @@ export class AdsService {
 		const sortBy = query.sortBy ?? 'newest';
 		const includeInactive = !!(
 			query.includeInactive &&
-			(this.isPrivileged(viewer) || query.userId === viewer?.id)
+			viewer &&
+			(this.isPrivileged(viewer) || query.userId === viewer.id)
 		);
 
 		if (sortBy === 'distance') {

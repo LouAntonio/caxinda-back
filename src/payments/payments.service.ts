@@ -108,14 +108,24 @@ export class PaymentsService {
 			);
 		}
 
-		const listingsInUse = await this.prisma.subscription.count({
+		// Conta quantos negócios do utilizador já têm uma subscrição ativa.
+		// O negócio corrente não tem subscrição ativa (a validação acima já
+		// rejeitaria esse caso), logo não precisa de ser excluído.
+		const activeBusinessCount = await this.prisma.business.count({
 			where: {
-				user: { businesses: { some: { ownerId: userId } } },
-				status: 'ACTIVE',
-				endDate: { gt: now },
+				ownerId: userId,
+				subscriptions: {
+					some: {
+						status: 'ACTIVE',
+						endDate: { gt: now },
+					},
+				},
 			},
 		});
-		if (listingsInUse >= plan.businessVisibilityLimit) {
+		if (
+			plan.businessVisibilityLimit > 0 &&
+			activeBusinessCount >= plan.businessVisibilityLimit
+		) {
 			throw new ConflictException(
 				'O seu plano atingiu o limite de listagens visíveis.',
 			);

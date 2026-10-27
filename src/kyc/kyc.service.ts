@@ -162,12 +162,17 @@ export class KycService {
 
 		const promoted = dto.status === 'APPROVED';
 
+		const userData: { isVerified: boolean; role?: 'PROMOTER' } = {
+			isVerified: promoted,
+		};
+		if (promoted) {
+			userData.role = 'PROMOTER';
+		}
+		// Na rejeição, não alteramos o role: o utilizador pode continuar
+		// PROMOTER com empresas ativas; apenas perde a verificação de identidade.
 		await this.prisma.user.update({
 			where: { id: updated.userId },
-			data: {
-				isVerified: promoted,
-				role: promoted ? 'PROMOTER' : 'USER',
-			},
+			data: userData,
 		});
 
 		await this.sendKycEmail(dto, updated.userId);

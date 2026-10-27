@@ -75,6 +75,14 @@ import { WishlistModule } from './wishlist/wishlist.module';
 						'redis://localhost:6379',
 					),
 				},
+				// Ativa o scheduler do BullMQ para que os jobs repetitivos
+				// definidos em AnalyticsModule.onApplicationBootstrap
+				// (flush a cada 10 min, prune diário às 3h) sejam executados.
+				bullMQScheduler: true,
+				defaultJobOptions: {
+					removeOnComplete: 1000,
+					removeOnFail: 1000,
+				},
 			}),
 		}),
 		PrismaModule,
