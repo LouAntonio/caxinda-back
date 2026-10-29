@@ -74,6 +74,14 @@ async function bootstrap() {
 		const resolvedPath = path.startsWith(authBasePath)
 			? path
 			: `${authBasePath}${path}`;
+
+		// Os endpoints do plugin `admin` do better-auth (/api/auth/admin/*)
+		// são bloqueados no catch-all do AuthController por razões de
+		// segurança (escalonamento de privilégios). Não os expomos no Swagger.
+		if (/\/auth\/admin(?:\/|$)/.test(resolvedPath)) {
+			continue;
+		}
+
 		const normalizedOperations: BetterAuthPath = {};
 		for (const [method, operation] of Object.entries(operations ?? {})) {
 			if (!operation || typeof operation !== 'object') {

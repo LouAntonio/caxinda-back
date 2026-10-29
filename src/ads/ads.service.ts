@@ -433,7 +433,13 @@ export class AdsService {
 		// always read fresh to avoid leaking privileged state. Com proximidade
 		// também lemos sempre fresco, pois a distância varia com o referencial.
 		if (!proximity && (viewer === null || viewer === undefined)) {
-			const cached = await this.cache.get<CacheableAd>(`ad:${id}`);
+			let cached: CacheableAd | null = null;
+			try {
+				cached = await this.cache.get<CacheableAd>(`ad:${id}`);
+			} catch {
+				// Redis indisponível: leitura fresca do banco abaixo.
+				cached = null;
+			}
 			if (cached) {
 				void this.analytics.trackView('AD', id);
 				return this.withLocation(this.restoreAd(cached), id);
@@ -465,11 +471,16 @@ export class AdsService {
 			(viewer === null || viewer === undefined) &&
 			visible
 		) {
-			await this.cache.set(
-				`ad:${id}`,
-				this.serializeAd(ad),
-				this.AD_TTL_MS,
-			);
+			try {
+				await this.cache.set(
+					`ad:${id}`,
+					this.serializeAd(ad),
+					this.AD_TTL_MS,
+				);
+			} catch {
+				// Redis indisponível: a leitura fresca já foi retornada;
+				// não bloqueamos a resposta por causa da escrita em cache.
+			}
 		}
 
 		const location = await this.getLocation(id);
@@ -486,7 +497,12 @@ export class AdsService {
 	) {
 		const cachedKey = `ad:slug:${slug}`;
 		if (!proximity && (viewer === null || viewer === undefined)) {
-			const cached = await this.cache.get<CacheableAd>(cachedKey);
+			let cached: CacheableAd | null = null;
+			try {
+				cached = await this.cache.get<CacheableAd>(cachedKey);
+			} catch {
+				cached = null;
+			}
 			if (cached) {
 				void this.analytics.trackView('AD', cached.id);
 				return this.withLocation(this.restoreAd(cached), cached.id);
@@ -518,11 +534,16 @@ export class AdsService {
 			(viewer === null || viewer === undefined) &&
 			visible
 		) {
-			await this.cache.set(
-				cachedKey,
-				this.serializeAd(ad),
-				this.AD_TTL_MS,
-			);
+			try {
+				await this.cache.set(
+					cachedKey,
+					this.serializeAd(ad),
+					this.AD_TTL_MS,
+				);
+			} catch {
+				// Redis indisponível: não bloqueamos a resposta por causa da
+				// escrita em cache.
+			}
 		}
 
 		const location = await this.getLocation(ad.id);
